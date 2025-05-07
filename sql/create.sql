@@ -1,0 +1,50 @@
+CREATE TABLE `user` (
+                        `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+                        `email` varchar(100) NOT NULL COMMENT '邮箱',
+                        `email_verified` tinyint(1) NOT NULL DEFAULT '0' COMMENT '邮箱验证状态',
+                        `password` varchar(255) DEFAULT NULL COMMENT '密码(加密存储，可选)',
+                        `avatar` varchar(255) DEFAULT NULL COMMENT '头像URL',
+                        `nickname` varchar(50) DEFAULT NULL COMMENT '用户昵称',
+                        `role` varchar(20) NOT NULL DEFAULT 'user' COMMENT '角色:user-普通用户,admin-管理员,super_admin-超级管理员',
+                        `gender` tinyint NOT NULL DEFAULT '0' COMMENT '性别:0未知,1男,2女',
+                        `birthday` date DEFAULT NULL COMMENT '生日',
+                        `height` decimal(5,2) DEFAULT NULL COMMENT '身高(cm)',
+                        `weight` decimal(5,2) DEFAULT NULL COMMENT '体重(kg)',
+                        `target_weight` decimal(5,2) DEFAULT NULL COMMENT '目标体重(kg)',
+                        `bmi` decimal(5,2) DEFAULT NULL COMMENT 'BMI指数',
+                         -- VIP相关字段
+                        `is_vip` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否VIP:0否,1是',
+                        `vip_expire_time` datetime DEFAULT NULL COMMENT 'VIP过期时间',
+                        `vip_level` tinyint DEFAULT '0' COMMENT 'VIP等级',
+
+                        `status` tinyint NOT NULL DEFAULT '1' COMMENT '账号状态:0禁用,1正常',
+                        `last_login_time` datetime DEFAULT NULL COMMENT '最后登录时间',
+                        `last_login_ip` varchar(50) DEFAULT NULL COMMENT '最后登录IP',
+                        `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                        `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                        PRIMARY KEY (`id`),
+                        UNIQUE KEY `idx_email` (`email`),
+                        KEY `idx_nickname` (`nickname`),
+                        KEY `idx_vip` (`is_vip`, `vip_expire_time`) COMMENT 'VIP状态索引',
+                        KEY `idx_role` (`role`) COMMENT '角色索引'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+CREATE TABLE `food_library` (
+                                `id` bigint NOT NULL AUTO_INCREMENT COMMENT '食物ID',
+                                `name` varchar(100) NOT NULL COMMENT '食物名称',
+                                `category_id` bigint DEFAULT NULL COMMENT '分类ID',
+                                `category_name` varchar(50) DEFAULT NULL COMMENT '分类名称',
+                                `calories` decimal(8,2) NOT NULL COMMENT '热量(kcal/100g)',
+                                `protein` decimal(8,2) DEFAULT NULL COMMENT '蛋白质(g/100g)',
+                                `fat` decimal(8,2) DEFAULT NULL COMMENT '脂肪(g/100g)',
+                                `carbohydrate` decimal(8,2) DEFAULT NULL COMMENT '碳水化合物(g/100g)',
+                                `fiber` decimal(8,2) DEFAULT NULL COMMENT '膳食纤维(g/100g)',
+                                `image` varchar(255) DEFAULT NULL COMMENT '图片URL',
+                                `is_common` tinyint DEFAULT '0' COMMENT '是否常见食物:0否,1是',
+                                `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除:0否,1是',
+                                PRIMARY KEY (`id`),
+                                KEY `idx_name` (`name`),
+                                KEY `idx_category` (`category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='食物库表';

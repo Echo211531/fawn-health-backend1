@@ -1,0 +1,106 @@
+server:
+  port: 8112
+  servlet:
+    context-path: /api
+
+spring:
+  # DashScope API Key 配置
+  ai:
+    dashscope:
+      api-key: sk-eaafa46f766940c1b53c76a28fc6babc  # 请替换为你的 DashScope API 密钥
+
+  redisson:
+    host: ${spring.redisson.host}
+    port: ${spring.redisson.port}
+    password: ${spring.redisson.password}
+    database: ${spring.redisson.database}
+
+  rabbitmq:
+    host: ${spring.rabbitmq.host}
+    port: ${spring.rabbitmq.port}
+    username: ${spring.rabbitmq.username}
+    password: ${spring.rabbitmq.password}
+    # 开启confirm机制
+    publisher-confirm-type: correlated
+    # 开启return机制
+    publisher-returns: true
+    #全局配置，局部配置存在就以局部为准
+    listener:
+      simple:
+        acknowledge-mode: manual # 手动ACK
+
+  profiles:
+    active: local
+  application:
+    name: fawn-health
+  data:
+    redis:
+      database: 0
+      host: localhost
+      port: 6379
+      password: 123456
+      timeout: 5000
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/fawn_health?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+
+  mail:
+    host: smtp.163.com
+    protocol: smtps
+    port: 587
+    username: 15826333626@163.com
+    password: VWcJ4DkYeYFcnESy
+    nickname: 小鹿健康
+    default-encoding: UTF-8
+    test-connection: true
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+  # Springdoc OpenAPI配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.ljh.fawnhealth.controller
+
+  # Knife4j配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+  # OSS配置
+ali:
+  oss:
+    endpoint: ${ali.oss.endpoint}
+    access-key-id: ${ali.oss.access-key-id}
+    access-key-secret: ${ali.oss.access-key-secret}
+    bucket-name: ${ali.oss.bucket-name}
+
+
+sky:
+  jwt:
+    # jwt秘钥
+    user-secret-key: fawnhealth
+    # 过期时间
+    user-ttl: 7200000
+    # 前端传过来的令牌名称，可以改变和前端商量
+    user-token-name: token
+
+
+
+
