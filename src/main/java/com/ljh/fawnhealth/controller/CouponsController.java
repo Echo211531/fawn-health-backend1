@@ -27,6 +27,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 优惠券管理控制器
+ * 提供优惠券的增删改查、发放管理、分页查询等功能接口
+ */
 @Slf4j
 @RestController
 @RequestMapping("/coupons")
@@ -37,42 +41,21 @@ public class CouponsController {
 
     /**
      * 新增优惠券
-     * @param couponsFormDTO
-     * @return
+     *
+     * @param couponsFormDTO 优惠券表单数据（包含名称、类型、面值、有效期等信息）
+     * @return 操作结果响应（成功时返回提示信息）
      */
     @PostMapping("/addCoupons")
-    public BaseResponse<String> addCoupons(@RequestBody CouponsFormDTO couponsFormDTO){
+    public BaseResponse<String> addCoupons(@RequestBody CouponsFormDTO couponsFormDTO) {
         couponsService.addCoupons(couponsFormDTO);
         return ResultUtils.success("优惠券添加成功");
     }
 
-
-//    @GetMapping("/page1")
-//    public BaseResponse<Page<CouponsPageVO>> queryCouponByPage(
-//            @RequestParam(defaultValue = "1") Integer pageNo,
-//            @RequestParam(defaultValue = "10") Integer pageSize,
-//            @RequestParam(required = false) Integer type,
-//            @RequestParam(required = false) Integer status,
-//            @RequestParam(required = false) String name,
-//            @RequestParam(defaultValue = "false") Boolean isAsc,
-//            @RequestParam(defaultValue = "createTime") String sortBy) {
-//
-//        CouponsQuery query = new CouponsQuery();
-//        query.setPageNo(pageNo);
-//        query.setPageSize(pageSize);
-//        query.setType(type);
-//        query.setStatus(status);
-//        query.setName(name);
-//        query.setIsAsc(isAsc);
-//        query.setSortBy(sortBy);
-//
-//        return ResultUtils.success(couponsService.queryCouponByPage(query));
-//    }
-
     /**
      * 分页查询优惠券接口
-     * @param
-     * @return
+     *
+     * @param couponsQuery 分页查询条件（包含页码、每页数量、类型、状态、名称、排序规则等）
+     * @return 分页响应对象（包含优惠券列表及分页信息）
      */
     @PostMapping("/page")
     public BaseResponse<PageDTO<CouponsPageVO>> queryCouponByPage(@RequestBody CouponsQuery couponsQuery) {
@@ -81,26 +64,28 @@ public class CouponsController {
     }
 
     /**
-     * 根据ID查询优惠券
-     * @param id 优惠券ID
-     * @return 优惠券详情
+     * 根据ID查询优惠券详情
+     *
+     * @param id 优惠券ID（路径参数，不能为空）
+     * @return 优惠券详情视图对象
      */
     @PostMapping("/getCouponsById")
-    public BaseResponse<CouponsDetailVO> getCouponById(Long id) {
-        CouponsDetailVO couponS = couponsService.getCouponById(id);
-        if (couponS == null) {
+    public BaseResponse<CouponsDetailVO> getCouponById(@RequestParam Long id) { // 补充@RequestParam注解
+        CouponsDetailVO coupon = couponsService.getCouponById(id);
+        if (coupon == null) {
             return ResultUtils.error(ErrorCode.COUPON_NOT_FOUND);
         }
-        return ResultUtils.success(couponS);
+        return ResultUtils.success(coupon);
     }
 
     /**
-     * 删除优惠券
-     * @param id 优惠券ID
-     * @return 操作结果
+     * 删除优惠券（逻辑删除或物理删除，根据业务需求）
+     *
+     * @param id 优惠券ID（路径参数，不能为空）
+     * @return 操作结果响应（成功时返回提示信息）
      */
     @PostMapping("/deleteCoupons")
-    public BaseResponse<String> deleteCoupon(Long id) {
+    public BaseResponse<String> deleteCoupon(@RequestParam Long id) { // 补充@RequestParam注解
         boolean removed = couponsService.deleteCoupon(id);
         if (!removed) {
             return ResultUtils.error(ErrorCode.COUPON_NOT_FOUND);
@@ -109,19 +94,22 @@ public class CouponsController {
     }
 
     /**
-     * 修改优惠券
-     * @param couponsFormDTO 修改内容
-     * @return 操作结果
+     * 修改优惠券信息
+     *
+     * @param couponsFormDTO 包含修改后优惠券信息的表单数据（ID必须存在）
+     * @return 操作后的优惠券详情视图对象
      */
     @PostMapping("/updateCoupons")
     public BaseResponse<CouponsDetailVO> updateCoupon(@RequestBody CouponsFormDTO couponsFormDTO) {
-        CouponsDetailVO couponsDetailVO = couponsService.updateCoupon(couponsFormDTO);
-        return ResultUtils.success(couponsDetailVO);
+        CouponsDetailVO updatedCoupon = couponsService.updateCoupon(couponsFormDTO);
+        return ResultUtils.success(updatedCoupon);
     }
 
     /**
-     * 发放优惠券
-     * @param dto
+     * 发放优惠券至用户账户
+     *
+     * @param dto 优惠券发放表单数据（包含优惠券ID、发放用户ID、发放数量等）
+     * @return 操作结果响应（成功时返回提示信息）
      */
     @PostMapping("/issue")
     public BaseResponse<String> beginIssue(@RequestBody CouponsIssueFormDTO dto) {
@@ -130,23 +118,26 @@ public class CouponsController {
     }
 
     /**
-     * 查询发放中的优惠券列表
-     * @return
+     * 查询当前正在发放中的优惠券列表
+     *
+     * @param id 可选参数（如活动ID或用户ID，根据业务逻辑确定）
+     * @return 正在发放的优惠券视图列表
      */
     @GetMapping("/list")
-    public BaseResponse<List<CouponsVO>> queryIssuingCoupons(Long id){
+    public BaseResponse<List<CouponsVO>> queryIssuingCoupons(@RequestParam(required = false) Long id) { // 补充参数注解
         List<CouponsVO> list = couponsService.queryIssuingCoupons(id);
         return ResultUtils.success(list);
     }
 
     /**
-     * 暂停发放优惠券
-     * @param couponsId
+     * 暂停指定优惠券的发放
+     *
+     * @param couponsId 待暂停发放的优惠券ID
+     * @return 操作结果响应（成功时返回提示信息）
      */
     @PostMapping("/pause")
-    public BaseResponse<String> pauseIssue(Long couponsId){
+    public BaseResponse<String> pauseIssue(@RequestParam Long couponsId) { // 补充@RequestParam注解
         couponsService.pauseIssue(couponsId);
         return ResultUtils.success("暂停发放优惠券");
     }
-
 }

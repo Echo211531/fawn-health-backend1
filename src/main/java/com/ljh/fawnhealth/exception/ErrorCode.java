@@ -19,7 +19,7 @@ public enum ErrorCode {
     PASSWORD_TOO_WEAK(40006, "密码强度不足"),
     ACCOUNT_DISABLED(40007, "账号已禁用"),
     UPLOAD_FAILED(40008,"文件上传错误"),
-
+    USER_NOTFOUND(40009,"用户不存在"),
 
     // 登录相关错误码 40100 - 40200
     NOT_LOGIN_ERROR(40100, "未登录"),
@@ -45,6 +45,8 @@ public enum ErrorCode {
     COMMUNITY_POST_NOT_FOUND(40402, "社区帖子不存在"),
     COMMENT_NOT_FOUND(40403, "评论不存在"),
     POST_TYPE_ERROR(40404, "帖子类型错误"),
+    ADD_POST_ERROR(40405,"发帖失败"),
+    UPDATE_POST_ERROR(40406,"帖子修改失败"),
 
     // 系统与会员相关错误码 40500 - 40600
     VIP_ORDER_NOT_FOUND(40500, "会员订单不存在"),
@@ -64,10 +66,6 @@ public enum ErrorCode {
     COUPON_OVER_LIMIT(40514, "优惠券超出领取数量"),
     EXCHANGE_CODE_OVERDUE(40515,"兑换码已经过期"),
     EXCHANGE_CODE_USE(40515,"兑换码已经被兑换过了"),
-
-
-
-
 
 
     // 商品模块相关错误码 40600 - 40700

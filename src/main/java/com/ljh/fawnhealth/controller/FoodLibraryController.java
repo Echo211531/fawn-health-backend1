@@ -30,6 +30,7 @@ public class FoodLibraryController {
 
     /**
      * 获取食物分类列表
+     *
      * @return 食物分类列表（VO）
      */
     @GetMapping("/foodCategoriesList")
@@ -41,6 +42,7 @@ public class FoodLibraryController {
 
     /**
      * 添加食物
+     *
      * @param foodAddDTO 添加食物DTO
      * @return foodLibraryVO
      */
@@ -53,6 +55,7 @@ public class FoodLibraryController {
 
     /**
      * 修改食物
+     *
      * @param foodUpdateDTO  修改食物DTO
      * @return foodLibraryVO
      */
@@ -65,6 +68,7 @@ public class FoodLibraryController {
 
     /**
      * 删除食物
+     *
      * @param foodId 食物 ID
      * @return 删除成功
      */
@@ -77,6 +81,7 @@ public class FoodLibraryController {
 
     /**
      * 根据分类 ID 获取该分类下的食物列表
+     *
      * @param categoryId 分类 ID
      * @return 食物列表
      */
@@ -89,6 +94,7 @@ public class FoodLibraryController {
 
     /**
      * 根据食物 ID 获取完整的食物信息
+     *
      * @param foodId 食物 ID
      * @return 食物信息 VO
      */
@@ -101,6 +107,7 @@ public class FoodLibraryController {
 
     /**
      * 添加食物分类
+     *
      * @param foodCategoryAddDTO 分类信息
      * @return 添加后的分类信息
      */
@@ -113,6 +120,7 @@ public class FoodLibraryController {
 
     /**
      * 修改食物分类
+     *
      * @param foodCategoryUpdateDTO 分类信息
      * @return 修改后的分类信息
      */
@@ -125,6 +133,7 @@ public class FoodLibraryController {
 
     /**
      * 删除食物分类
+     *
      * @param categoryId 分类 ID
      * @return 删除成功
      */

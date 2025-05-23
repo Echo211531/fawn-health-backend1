@@ -45,9 +45,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * @author 27105
- * @description 针对表【coupons(优惠券表)】的数据库操作Service实现
- * @createDate 2025-05-02 23:02:45
+ * 优惠券服务接口实现类
+ * 提供优惠券的增删改查、发放管理等业务逻辑
  */
 @Slf4j
 @Service
@@ -71,10 +70,11 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
 
     @Resource
     private RedisTemplate<String, String> redisTemplate;
+
     /**
      * 新增优惠券
      *
-     * @param couponsFormDTO
+     * @param couponsFormDTO 优惠券表单数据，包含基础信息及适用范围
      */
     @Override
     @Transactional
@@ -86,17 +86,17 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
         coupons.setObtainWay(couponsFormDTO.getObtainWay().getValue());
         couponsMapper.insert(coupons);
 
-        // 保存优惠券限定范围信息
+        // 保存优惠券限定范围信息（若为特定范围优惠券）
         if (couponsFormDTO.getSpecific()) {
             Long couponsId = coupons.getId();
             List<Long> scopes = couponsFormDTO.getScopes();
-            // 验证优惠券 ID 是否为空
+            // 验证适用范围是否为空
             ThrowUtils.throwIf(scopes == null, ErrorCode.COUPON_SCOPE_NOT_FOUND);
             List<CouponsScope> couponsScopes = new ArrayList<>();
             for (Long bizId : scopes) {
                 CouponsScope couponsScope = new CouponsScope();
                 couponsScope.setBizId(bizId);
-                couponsScope.setType(1);
+                couponsScope.setType(1); // type=1表示业务ID范围
                 couponsScope.setCouponId(couponsId);
                 couponsScopes.add(couponsScope);
             }
@@ -104,14 +104,15 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
             for (CouponsScope couponsScope : couponsScopes) {
                 count += couponsScopeMapper.insert(couponsScope);
             }
-            log.info("插入数量:{}" , count);
+            log.info("插入优惠券范围记录数量:{}", count);
         }
     }
 
     /**
      * 分页查询优惠券
-     * @param query 查询条件
-     * @return 分页结果
+     *
+     * @param query 查询条件对象，包含分页参数、类型、状态、名称等筛选条件
+     * @return 分页结果对象，包含优惠券视图列表及分页信息
      */
     @Override
     public PageDTO<CouponsPageVO> queryCouponByPage(CouponsQuery query) {
@@ -122,24 +123,24 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
         // 构造分页对象
         Page<Coupons> page = new Page<>(query.getPageNo(), query.getPageSize());
 
-        // 构造查询条件
+        // 构造查询条件（类型、状态、名称模糊查询、按创建时间倒序）
         LambdaQueryWrapper<Coupons> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(query.getType() != null, Coupons::getDiscountType, query.getType())
                 .eq(query.getStatus() != null, Coupons::getStatus, query.getStatus())
                 .like(StringUtils.isNotBlank(query.getName()), Coupons::getName, query.getName())
                 .orderByDesc(Coupons::getCreateTime);
 
-        // 执行分页查询（使用 mapper）
+        // 执行分页查询
         couponsMapper.selectPage(page, queryWrapper);
 
-        // 转换记录为 VO
+        // 将实体对象转换为视图对象
         List<CouponsPageVO> voRecords = page.getRecords().stream().map(coupons -> {
             CouponsPageVO vo = new CouponsPageVO();
             BeanUtils.copyProperties(coupons, vo);
             return vo;
         }).collect(Collectors.toList());
 
-        // 构造 VO 分页对象
+        // 构造分页结果对象
         PageDTO<CouponsPageVO> voPage = new PageDTO<>(page.getCurrent(), page.getSize(), page.getTotal());
         log.info("分页结果：总数={}, 当前页={}, 每页大小={}, 实际返回记录数={}",
                 page.getTotal(), page.getCurrent(), page.getSize(), page.getRecords().size());
@@ -150,14 +151,14 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
     }
 
     /**
-     * 根据ID查询优惠券
+     * 根据ID查询优惠券详情
      *
-     * @param id
-     * @return
+     * @param id 优惠券ID
+     * @return 优惠券详情视图对象
      */
     @Override
     public CouponsDetailVO getCouponById(Long id) {
-        ThrowUtils.throwIf(id == null, ErrorCode.COUPON_NOT_FOUND);
+        ThrowUtils.throwIf(id == null, ErrorCode.COUPON_NOT_FOUND); // 校验ID非空
         Coupons coupons = couponsMapper.selectById(id);
         CouponsDetailVO vo = new CouponsDetailVO();
         BeanUtils.copyProperties(coupons, vo);
@@ -165,106 +166,99 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
     }
 
     /**
-     * 删除优惠券
+     * 删除优惠券（物理删除）
      *
-     * @param id
-     * @return
+     * @param id 优惠券ID
+     * @return 删除成功与否
      */
     @Override
     public boolean deleteCoupon(Long id) {
-        ThrowUtils.throwIf(id == null, ErrorCode.COUPON_NOT_FOUND);
+        ThrowUtils.throwIf(id == null, ErrorCode.COUPON_NOT_FOUND); // 校验ID非空
         int i = couponsMapper.deleteById(id);
-        if (i > 0) {
-            return true;
-        }
-        return false;
+        return i > 0;
     }
 
-
     /**
-     * 修改优惠券
+     * 修改优惠券信息
      *
-     * @param couponsFormDTO
-     * @return
+     * @param couponsFormDTO 包含修改后信息的表单对象（必须包含ID）
+     * @return 修改后的优惠券详情视图对象
      */
     @Override
     public CouponsDetailVO updateCoupon(CouponsFormDTO couponsFormDTO) {
-        // 判空校验
+        // 校验参数非空及ID存在
         ThrowUtils.throwIf(couponsFormDTO == null || couponsFormDTO.getId() == null, ErrorCode.PARAMS_ERROR, "优惠券ID不能为空");
 
         // 查询原优惠券是否存在
         Coupons existing = couponsMapper.selectById(couponsFormDTO.getId());
         ThrowUtils.throwIf(existing == null, ErrorCode.COUPON_NOT_FOUND);
 
-        // 拷贝并更新数据
+        // 拷贝更新数据并转换枚举值
         Coupons coupons = BeanCopyUtils.copy(couponsFormDTO, Coupons.class);
         coupons.setObtainWay(couponsFormDTO.getObtainWay().getValue());
         coupons.setDiscountType(couponsFormDTO.getDiscountType().getValue());
         int rows = couponsMapper.updateById(coupons);
         ThrowUtils.throwIf(rows <= 0, ErrorCode.OPERATION_ERROR, "更新失败");
 
-        // 查询修改后的优惠券并返回
+        // 返回最新数据
         Coupons updated = couponsMapper.selectById(couponsFormDTO.getId());
         CouponsDetailVO vo = BeanCopyUtils.copy(updated, CouponsDetailVO.class);
         return vo;
     }
 
     /**
-     * 发放优惠券
+     * 发放优惠券（核心业务逻辑）
      *
-     * @param dto
+     * @param dto 发放参数，包含优惠券ID、发放时间、用户限制等
      */
     @Transactional
     @Override
     public void beginIssue(CouponsIssueFormDTO dto) {
-        // 1.查询优惠券
+        // 1. 查询优惠券信息
         Coupons coupons = getById(dto.getId());
         ThrowUtils.throwIf(coupons == null, ErrorCode.COUPON_NOT_FOUND);
 
-        // 2.判断优惠券状态，是否是暂停或待发放
-        if (coupons.getStatus() != 1 && coupons.getStatus() != 5) {
+        // 2. 校验优惠券状态（仅允许待发放或暂停状态）
+        if (coupons.getStatus() != 1 && coupons.getStatus() != 5) { // 1=待发放，5=暂停（对应枚举值）
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "优惠券状态错误！");
         }
 
-        // 3.判断是否是立刻发放
+        // 3. 判断是否立即发放（根据发放开始时间）
         Date issueBeginTime = dto.getIssueBeginTime();
         Date now = new Date();
-
-        // 检查 issueBeginTime 是否为 null，或者 issueBeginTime 是否早于当前时间
         boolean isBegin = issueBeginTime == null || issueBeginTime.before(now);
 
-        // 4.更新优惠券
-        // 4.1.拷贝属性到PO
+        // 4. 更新优惠券状态及时间
         Coupons c = BeanCopyUtils.copy(dto, Coupons.class);
-
-        // 4.2.更新状态
         if (isBegin) {
-            c.setStatus(CouponStatus.ISSUING.getValue());
+            c.setStatus(CouponStatus.ISSUING.getValue()); // 发放中状态
             c.setIssueBeginTime(now);
         } else {
-            c.setStatus(CouponStatus.UN_ISSUE.getValue());
+            c.setStatus(CouponStatus.UN_ISSUE.getValue()); // 待发放状态
         }
-
-        // 4.3.写入数据库
         updateById(c);
 
-        // 5.添加缓存，前提是立刻发放的
+        // 5. 立即发放时缓存优惠券信息
         if (isBegin) {
             coupons.setIssueBeginTime(c.getIssueBeginTime());
             coupons.setIssueEndTime(c.getIssueEndTime());
             cacheCouponInfo(coupons);
         }
 
-        // 兑换码生成
-        // 5.判断是否需要生成兑换码，优惠券类型必须是兑换码，优惠券状态必须是待发放
-        if(coupons.getObtainWay() == 2 && coupons.getStatus() == 1){
+        // 6. 生成兑换码（若为兑换码类型且状态为待发放）
+        if (coupons.getObtainWay() == 2 && coupons.getStatus() == 1) { // 2=兑换码类型，1=待发放状态
             coupons.setIssueEndTime(c.getIssueEndTime());
             codeService.asyncGenerateCode(coupons);
         }
     }
 
+    /**
+     * 缓存优惠券发放信息到Redis
+     *
+     * @param coupons 待缓存的优惠券对象
+     */
     private void cacheCouponInfo(Coupons coupons) {
-        // 1.组织数据
+        // 1. 组织缓存数据（包含发放时间、数量限制等关键信息）
         Map<String, String> map = new HashMap<>(6);
         map.put("issueBeginTime", String.valueOf(coupons.getIssueBeginTime().getTime()));
         map.put("issueEndTime", String.valueOf(coupons.getIssueEndTime().getTime()));
@@ -273,96 +267,99 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
         map.put("issueNum", String.valueOf(coupons.getIssueNum()));
         map.put("id", String.valueOf(coupons.getId()));
         map.put("termDays", coupons.getTermDays() != null ? String.valueOf(coupons.getTermDays()) : "0");
-        // 打印缓存键和内容
+        // 打印缓存键值对（调试用）
         String cacheKey = PromotionConstants.COUPON_CACHE_KEY_PREFIX + coupons.getId();
         System.out.println("Cache key: " + cacheKey);
         System.out.println("Cache value: " + map);
 
-        // 2.写缓存
+        // 2. 写入Redis缓存（使用Hash结构）
         redisTemplate.opsForHash().putAll(PromotionConstants.COUPON_CACHE_KEY_PREFIX + coupons.getId(), map);
     }
 
-
     /**
-     * 查询发放中的优惠券列表
+     * 查询发放中的优惠券列表（含用户领取状态）
      *
-     * @return
+     * @param id 用户ID（可选，用于查询用户领取情况）
+     * @return 发放中的优惠券视图列表
      */
     @Override
     public List<CouponsVO> queryIssuingCoupons(Long id) {
-        // 1.查询发放中的优惠券列表
+        // 1. 查询所有状态为“发放中”且领取方式为“公开领取”的优惠券
         List<Coupons> coupons = lambdaQuery()
-                .eq(Coupons::getStatus, CouponStatus.ISSUING)
-                .eq(Coupons::getObtainWay, ObtainType.PUBLIC)
+                .eq(Coupons::getStatus, CouponStatus.ISSUING) // 发放中状态
+                .eq(Coupons::getObtainWay, ObtainType.PUBLIC) // 公开领取类型
                 .list();
 
         if (coupons == null || coupons.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 2.统计当前用户已经领取的优惠券的信息
+        // 2. 统计用户领取记录（若传入用户ID）
         List<Long> couponIds = coupons.stream().map(Coupons::getId).collect(Collectors.toList());
-        User user = userMapper.selectById(id);
-        // 2.1.查询当前用户已经领取的优惠券的数据
-        List<UserCoupon> userCoupons = userCouponService.lambdaQuery()
-                .eq(UserCoupon::getUserId, user)
-                .in(UserCoupon::getCouponId, couponIds)
-                .list();
-        // 2.2.统计当前用户对优惠券的已经领取数量
+        User user = id != null ? userMapper.selectById(id) : null;
+        List<UserCoupon> userCoupons = Collections.emptyList();
+        if (user != null) {
+            // 查询用户已领取的优惠券
+            userCoupons = userCouponService.lambdaQuery()
+                    .eq(UserCoupon::getUserId, user.getId()) // 关联用户ID
+                    .in(UserCoupon::getCouponId, couponIds) // 关联优惠券ID列表
+                    .list();
+        }
+
+        // 2.1 统计已领取数量和未使用数量
         Map<Long, Long> issuedMap = userCoupons.stream()
                 .collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
-        // 2.3.统计当前用户对优惠券的已经领取并且未使用的数量
         Map<Long, Long> unusedMap = userCoupons.stream()
-                .filter(uc -> uc.getStatus() == UserCouponStatus.UNUSED)
+                .filter(uc -> uc.getStatus() == UserCouponStatus.UNUSED) // 未使用状态
                 .collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
-        // 3.封装VO结果
+
+        // 3. 封装视图对象并计算领取状态
         List<CouponsVO> list = new ArrayList<>(coupons.size());
         for (Coupons c : coupons) {
-            // 3.1.拷贝PO属性到VO
             CouponsVO vo = BeanCopyUtils.copy(c, CouponsVO.class);
-            list.add(vo);
-            // 3.2.是否可以领取：已经被领取的数量 < 优惠券总数量 && 当前用户已经领取的数量 < 每人限领数量
+            // 是否可领取：剩余库存 > 0 且 用户未超过领取限制
             vo.setAvailable(
                     c.getIssueNum() < c.getTotalNum()
                             && issuedMap.getOrDefault(c.getId(), 0L) < c.getUserLimit()
             );
-            // 3.3.是否可以使用：当前用户已经领取并且未使用的优惠券数量 > 0
-            vo.setReceived(unusedMap.getOrDefault(c.getId(),  0L) > 0);
+            // 是否已领取未使用：存在未使用记录
+            vo.setReceived(unusedMap.getOrDefault(c.getId(), 0L) > 0);
+            list.add(vo);
         }
         return list;
     }
 
     /**
      * 暂停发放优惠券
-     * @param id
+     *
+     * @param id 优惠券ID
      */
     @Override
     @Transactional
     public void pauseIssue(Long id) {
-        // 1.查询旧优惠券
+        // 1. 查询优惠券信息
         Coupons coupons = getById(id);
         if (coupons == null) {
             throw new BusinessException(ErrorCode.COUPON_NOT_FOUND);
         }
 
-        // 2.当前券状态必须是未开始或进行中
+        // 2. 校验状态（仅允许未开始或进行中状态暂停）
         CouponStatus status = CouponStatus.of(coupons.getStatus());
-        if (status != CouponStatus.UN_ISSUE && status != CouponStatus.ISSUING) {
+        if (status != CouponStatus.UN_ISSUE && status != CouponStatus.ISSUING) { // UN_ISSUE=待发放，ISSUING=发放中
             return;
         }
 
-        // 3.更新状态
+        // 3. 更新状态为“暂停”
         boolean success = lambdaUpdate()
-                .set(Coupons::getStatus, CouponStatus.PAUSE)
+                .set(Coupons::getStatus, CouponStatus.PAUSE) // 暂停状态
                 .eq(Coupons::getId, id)
-                .in(Coupons::getStatus, CouponStatus.UN_ISSUE, CouponStatus.ISSUING)
+                .in(Coupons::getStatus, CouponStatus.UN_ISSUE, CouponStatus.ISSUING) // 仅允许从待发放或发放中状态暂停
                 .update();
         if (!success) {
-            // 可能是重复更新，结束
-            log.error("重复暂停优惠券");
+            log.error("重复暂停优惠券，ID:{}", id); // 记录重复操作日志
         }
 
-        // 4.删除缓存
+        // 4. 清理缓存
         redisTemplate.delete(PromotionConstants.COUPON_CACHE_KEY_PREFIX + id);
     }
 

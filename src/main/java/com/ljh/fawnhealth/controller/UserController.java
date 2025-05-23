@@ -31,6 +31,7 @@ public class UserController {
 
     /**
      * 发送邮件验证码
+     *
      * @param email 接收邮箱
      * @return 发送结果
      */
@@ -52,6 +53,7 @@ public class UserController {
 
     /**
      * 邮箱验证码登录
+     *
      * @param userLoginDTO 登录相关DTO
      * @param request
      * @return UserLoginVO
@@ -79,6 +81,7 @@ public class UserController {
 
     /**
      * 退出登录
+     *
      * @return 退出成功
      */
     @PostMapping("/logout")
@@ -88,6 +91,7 @@ public class UserController {
 
     /**
      * 获取用户登录的ip地址
+     *
      * @param request
      * @return 字符串
      */
