@@ -16,4 +16,7 @@ public interface CommunityPostsConstant {
 
     // 用户点赞过期时间（7天，单位：秒）
     long USER_POSTS_LIKE_EXPIRE_TIME = 7 * 24 * 60 * 60L;
+
+    String TEMP_THUMB_KEY_PREFIX = "community:post:%s";
+
 }

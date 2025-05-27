@@ -2,14 +2,17 @@ package com.ljh.fawnhealth.controller;
 
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
+import com.ljh.fawnhealth.model.vo.coupons.UserCouponsVO;
 import com.ljh.fawnhealth.service.UserCouponService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
- * 用户优惠券操作控制器
- * 处理用户领取优惠券、兑换码兑换等业务逻辑
+ * 用户优惠券模块
+ * 提供用户领取优惠券、兑换码兑换等接口
  */
 @Slf4j
 @RestController
@@ -58,5 +61,20 @@ public class UserCouponController {
 
         log.info("兑换码兑换成功：用户[{}]，兑换码[{}]", userId, code);
         return ResultUtils.success("优惠券兑换成功");
+    }
+
+    /**
+     * 查询用户已领取的优惠券列表
+     *
+     * @param userId 用户ID（必填）
+     * @param status 优惠券状态（可选：0-未使用，1-已使用，2-已过期；不传表示查询全部）
+     * @return 用户优惠券列表
+     */
+    @GetMapping("/list")
+    public BaseResponse<List<UserCouponsVO>> listUserCoupons(@RequestParam("userId") Long userId,
+                                                             @RequestParam(value = "status", required = false) Integer status) {
+        log.info("查询用户[{}]的优惠券，状态: {}", userId, status);
+        List<UserCouponsVO> couponList = userCouponService.listUserCoupons(userId, status);
+        return ResultUtils.success(couponList);
     }
 }

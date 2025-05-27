@@ -161,7 +161,7 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
         ThrowUtils.throwIf(id == null, ErrorCode.COUPON_NOT_FOUND); // 校验ID非空
         Coupons coupons = couponsMapper.selectById(id);
         CouponsDetailVO vo = new CouponsDetailVO();
-        BeanUtils.copyProperties(coupons, vo);
+        BeanCopyUtils.copy(coupons, vo);
         return vo;
     }
 

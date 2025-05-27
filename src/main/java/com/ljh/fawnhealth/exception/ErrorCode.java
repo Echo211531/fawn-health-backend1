@@ -59,6 +59,7 @@ public enum ErrorCode {
     COUPON_EXPIRED(40507, "优惠券已过期"),
     COUPON_ALREADY_USED(40508, "优惠券已使用"),
     INVALID_VIP_TYPE(40509, "无效的会员类型"),
+    INVALID_VIP_NOT_FOUND(40509, "会员类型为空"),
     INVALID_PAYMENT_METHOD(40510, "无效的支付方式"),
     ORDER_STATUS_ERROR(40511, "订单状态错误"),
     COUPON_STOCK(40512,"优惠券库存不足"),

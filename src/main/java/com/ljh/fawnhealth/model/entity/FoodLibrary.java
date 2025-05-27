@@ -12,6 +12,7 @@ import java.util.Date;
 
 /**
  * 食物库表对应的实体类，用于封装食物的相关信息。
+ * @TableName food_library
  */
 @TableName(value ="food_library")
 @Data

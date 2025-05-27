@@ -13,6 +13,7 @@ import java.util.Date;
 
 /**
  * 用户实体类，对应数据库中的 `user` 表，用于封装用户的相关信息。
+ * @TableName user
  */
 @TableName(value ="user")
 @Data

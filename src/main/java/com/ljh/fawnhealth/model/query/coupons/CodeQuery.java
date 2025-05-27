@@ -1,15 +1,15 @@
 package com.ljh.fawnhealth.model.query.coupons;
 
-
 import com.ljh.fawnhealth.commen.PageQuery;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import javax.validation.constraints.NotNull;
-
+/**
+ * 兑换码查询条件封装类
+ * 用于筛选和分页查询优惠券兑换码列表，继承分页基础查询类
+ */
 @EqualsAndHashCode(callSuper = true)
 @Data
-
 public class CodeQuery extends PageQuery {
 
     /**

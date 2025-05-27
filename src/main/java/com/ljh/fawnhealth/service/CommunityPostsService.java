@@ -39,6 +39,12 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
     boolean likeCommunityPosts(Long postId, Long userId);
 
     /**
+     * 获取热点帖子列表
+     * 使用HeavyKeeper算法获取TopK热点
+     */
+    List<CommunityPostsVO> getHotPosts(int topN);
+
+    /**
      * 取消帖子点赞
      *
      * @param postId 被取消点赞的帖子ID
@@ -89,4 +95,6 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
      * @return 帖子详情视图对象，包含完整的帖子信息和相关统计数据
      */
     CommunityPostsVO getCommunityPostsByIdAdmin(Long postId);
+
+
 }

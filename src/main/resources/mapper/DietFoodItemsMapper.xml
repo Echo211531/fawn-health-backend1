@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.DietFoodItemsMapper">
+
+    <select id="selectByRecordId" resultType="com.ljh.fawnhealth.model.entity.DietFoodItems" parameterType="long">
+        SELECT *
+        FROM diet_food_items
+        WHERE record_id = #{recordId}
+          AND is_delete = 0
+    </select>
+
+    <delete id="deleteByRecordId" parameterType="java.lang.Long">
+        DELETE FROM diet_food_items WHERE record_id = #{recordId}
+    </delete>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO diet_food_items
+        (record_id, food_id, food_name, amount, unit, note, calories, protein, fat, carbohydrate, images, create_time, update_time, is_delete)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.recordId}, #{item.foodId}, #{item.foodName}, #{item.amount}, #{item.unit}, #{item.note},
+            #{item.calories}, #{item.protein}, #{item.fat}, #{item.carbohydrate}, #{item.images},
+            #{item.createTime}, #{item.updateTime}, #{item.isDelete}
+            )
+        </foreach>
+    </insert>
+
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.DietFoodItems">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="recordId" column="record_id" jdbcType="BIGINT"/>
+            <result property="foodId" column="food_id" jdbcType="BIGINT"/>
+            <result property="foodName" column="food_name" jdbcType="VARCHAR"/>
+            <result property="amount" column="amount" jdbcType="DECIMAL"/>
+            <result property="unit" column="unit" jdbcType="VARCHAR"/>
+            <result property="calories" column="calories" jdbcType="DECIMAL"/>
+            <result property="protein" column="protein" jdbcType="DECIMAL"/>
+            <result property="fat" column="fat" jdbcType="DECIMAL"/>
+            <result property="carbohydrate" column="carbohydrate" jdbcType="DECIMAL"/>
+            <result property="images" column="images" jdbcType="VARCHAR"/>
+            <result property="note" column="note" jdbcType="VARCHAR"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,record_id,food_id,
+        food_name,amount,unit,
+        calories,protein,fat,
+        carbohydrate,images,note,
+        create_time,update_time,is_delete
+    </sql>
+</mapper>

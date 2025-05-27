@@ -6,6 +6,7 @@ import com.ljh.fawnhealth.constant.CommunityPostsConstant;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.exception.ThrowUtils;
+import com.ljh.fawnhealth.manager.cache.CacheManager;
 import com.ljh.fawnhealth.mapper.CommunityPostsMapper;
 import com.ljh.fawnhealth.mapper.PostLikesMapper;
 import com.ljh.fawnhealth.model.entity.CommunityPosts;
@@ -17,6 +18,7 @@ import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import com.ljh.fawnhealth.manager.PostBloomFilterManager;
 
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -33,6 +35,7 @@ import java.util.stream.Collectors;
  * 社区帖子服务实现类
  * 包含帖子的查询、点赞、缓存管理等核心功能
  */
+@Slf4j
 @Service
 public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper, CommunityPosts>
         implements CommunityPostsService {
@@ -53,6 +56,9 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     @Lazy // 添加 @Lazy 注解延迟加载
     @Resource
     private PostBloomFilterManager postBloomFilterManager; // 布隆过滤器管理器，用于快速判断数据是否存在
+
+    @Resource
+    private CacheManager cacheManager; // 注入缓存管理器
 
     /**
      * 查询所有公开的社区帖子（带类型描述转换）
@@ -113,20 +119,20 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         ThrowUtils.throwIf(postId == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
         ThrowUtils.throwIf(!postBloomFilterManager.mightContain(postId), ErrorCode.COMMUNITY_POST_NOT_FOUND);
 
-        // 如果isPublic为空，默认当公开处理，也可以根据业务调整
         int publicFlag = (isPublic != null && (isPublic == 0 || isPublic == 1)) ? isPublic : 1;
+        //String redisKey = CommunityPostsConstant.POST_DETAIL_KEY_PREFIX + postId + ":" + (publicFlag == 1 ? "public" : "private");
 
-        // 生成带公开状态的缓存key
-        String redisKey = CommunityPostsConstant.POST_DETAIL_KEY_PREFIX + postId + ":" + (publicFlag == 1 ? "public" : "private");
+        // 使用CacheManager获取缓存（自动记录热点）
+        CommunityPostsVO cachedVO = (CommunityPostsVO) cacheManager.get(
+                CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
+                postId.toString()
+        );
 
-        // 从缓存获取
-        CommunityPostsVO cachedVO = (CommunityPostsVO) redisTemplate.opsForValue().get(redisKey);
         if (cachedVO != null) {
-            redisTemplate.opsForZSet().incrementScore(CommunityPostsConstant.POST_HOT_SCORE_KEY, postId, 1);
             return cachedVO;
         }
 
-        // 缓存未命中，数据库查询
+        // 缓存未命中，查询数据库
         QueryWrapper<CommunityPosts> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("id", postId);
         queryWrapper.eq("is_public", publicFlag);
@@ -137,11 +143,13 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         CommunityPostsVO postVO = new CommunityPostsVO();
         BeanCopyUtils.copy(post, postVO);
 
-        // 写缓存
-        redisTemplate.opsForValue().set(redisKey, postVO, CommunityPostsConstant.POST_CACHE_EXPIRE_TIME, TimeUnit.MINUTES);
-
-        // 增加热度分数
-        redisTemplate.opsForZSet().incrementScore(CommunityPostsConstant.POST_HOT_SCORE_KEY, postId, 1);
+        // 使用 put 方法写入缓存（同时更新本地和 Redis）
+        cacheManager.put(
+                CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
+                postId.toString(),
+                postVO,
+                60 * 60  // 设置超时时间（秒），例如1小时
+        );
 
         return postVO;
     }
@@ -174,38 +182,75 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         boolean success = false;
 
         if (existingLike != null) {
-            // 存在历史记录时，判断是否已取消点赞（is_delete=1表示已取消）
             if (existingLike.getIsDelete() == 0) {
-                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "请勿重复点赞"); // 已点赞则拒绝重复操作
+                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "请勿重复点赞");
             } else {
-                // 恢复点赞状态（取消点赞后重新点赞）
-                existingLike.setIsDelete(0); // 标记为未取消
-                existingLike.setUpdateTime(new Date()); // 更新操作时间
-                success = postLikesMapper.updateById(existingLike) > 0; // 执行更新操作
+                existingLike.setIsDelete(0);
+                existingLike.setUpdateTime(new Date());
+                success = postLikesMapper.updateById(existingLike) > 0;
             }
         } else {
-            // 不存在历史记录时，创建新的点赞记录
             PostLikes like = new PostLikes();
             like.setPostId(postId);
             like.setUserId(userId);
-            like.setCreateTime(new Date()); // 记录创建时间
-            like.setUpdateTime(new Date()); // 记录更新时间（初始值与创建时间一致）
-            like.setIsDelete(0); // 初始状态为未取消
-            success = postLikesMapper.insert(like) > 0; // 执行插入操作
+            like.setCreateTime(new Date());
+            like.setUpdateTime(new Date());
+            like.setIsDelete(0);
+            success = postLikesMapper.insert(like) > 0;
         }
 
-        // 异步更新Redis缓存（使用线程池避免事务阻塞）
+        // 异步更新缓存和热点统计
         if (success) {
             redisExecutor.execute(() -> {
+                // 更新用户点赞记录
                 String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
-                // 使用Hash结构存储用户点赞记录（key: userId, field: postId, value: true）
                 redisTemplate.opsForHash().put(redisKey, postId.toString(), true);
-                // 设置缓存过期时间（避免永久占用内存）
                 redisTemplate.expire(redisKey, CommunityPostsConstant.USER_POSTS_LIKE_EXPIRE_TIME, TimeUnit.SECONDS);
+
+                // 使用CacheManager记录热点（计数+1）
+                cacheManager.get(
+                        CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
+                        postId.toString()
+                );
             });
         }
 
         return success;
+    }
+
+    /**
+     * 获取热点帖子列表
+     * 使用HeavyKeeper算法获取TopK热点
+     */
+    @Override
+    public List<CommunityPostsVO> getHotPosts(int topN) {
+        List<String> hotPostIds = cacheManager.getHotKeys(topN);
+        if (hotPostIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 批量查询数据库
+        List<Long> postIds = hotPostIds.stream()
+                .map(Long::parseLong)
+                .collect(Collectors.toList());
+        List<CommunityPosts> posts = communityPostsMapper.selectBatchIds(postIds);
+
+        // 使用 LinkedHashMap 保持顺序
+        Map<Long, CommunityPosts> postMap = posts.stream()
+                .collect(Collectors.toMap(
+                        CommunityPosts::getId,
+                        post -> post,
+                        (existing, replacement) -> existing,
+                        LinkedHashMap::new
+                ));
+
+        // 按热度排序并转换为 VO
+        return hotPostIds.stream()
+                .map(Long::parseLong)
+                .map(postMap::get)
+                .filter(Objects::nonNull)
+                .map(this::convertToVO)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -268,7 +313,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     /**
      * 批量判断用户是否点赞多个帖子（含布隆过滤器预过滤和批量查询优化）
      *
-     * @param userId 用户ID
+     * @param userId  用户ID
      * @param postIds 帖子ID列表
      * @return 帖子ID到是否点赞的映射（不存在的帖子自动标记为false）
      */
@@ -310,13 +355,12 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     @Override
     @Transactional
     public Long publishPost(CommunityPosts post) {
-
-        // 初始化帖子的必要字段
+        // 初始化帖子字段
         post.setCreateTime(new Date());
         post.setUpdateTime(new Date());
         post.setIsDelete(0);
-        post.setIsPublic(post.getIsPublic());
-        post.setIsTop(post.getIsTop());
+        post.setIsPublic(post.getIsPublic()); // 默认为公开
+        post.setIsTop(post.getIsTop() != null ? post.getIsTop() : 0); // 默认为非置顶
 
         // 插入数据库
         int result = communityPostsMapper.insert(post);
@@ -327,13 +371,17 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         // 加入布隆过滤器
         postBloomFilterManager.add(postId);
 
-        // 将帖子写入 Redis 缓存
+        // ✅ 使用 CacheManager 写入缓存（自动处理本地和 Redis，记录热点）
         CommunityPostsVO vo = new CommunityPostsVO();
         BeanCopyUtils.copy(post, vo);
         vo.setPostTypeDesc(getPostTypeDescription(post.getPostType()));
 
-        String redisKey = CommunityPostsConstant.POST_DETAIL_KEY_PREFIX + postId;
-        redisTemplate.opsForValue().set(redisKey, vo, CommunityPostsConstant.POST_CACHE_EXPIRE_TIME, TimeUnit.MINUTES);
+        cacheManager.put(
+                CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
+                postId.toString(),
+                vo,
+                CommunityPostsConstant.POST_CACHE_EXPIRE_TIME * 60  // 转换为秒（原单位可能为分钟）
+        );
 
         return postId;
     }
@@ -348,7 +396,6 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     @Override
     @Transactional
     public CommunityPostsVO updatePostAndReturnVO(CommunityPosts updatedPost) {
-        // 检查帖子是否存在
         CommunityPosts originalPost = communityPostsMapper.selectById(updatedPost.getId());
         ThrowUtils.throwIf(originalPost == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
 
@@ -356,16 +403,17 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         int rows = communityPostsMapper.updateById(updatedPost);
 
         if (rows > 0) {
-            // 根据 updatedPost 的 isPublic 状态删除对应缓存
+            Long postId = updatedPost.getId();
             Integer isPublic = updatedPost.getIsPublic();
-            // 删除可能存在的两种缓存，避免缓存不一致
-            String publicKey = CommunityPostsConstant.POST_DETAIL_KEY_PREFIX + updatedPost.getId() + ":public";
-            String privateKey = CommunityPostsConstant.POST_DETAIL_KEY_PREFIX + updatedPost.getId() + ":private";
-            redisTemplate.delete(publicKey);
-            redisTemplate.delete(privateKey);
 
-            // 重新查询并返回最新视图对象
-            return getCommunityPostsById(updatedPost.getId(), isPublic);
+            // ✅ 使用 CacheManager 删除旧缓存（键格式为 hashKey:key，如 post:123）
+            cacheManager.delete(
+                    CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
+                    postId.toString()
+            );
+
+            // 重新查询并返回最新视图（触发缓存重新写入）
+            return getCommunityPostsById(postId, isPublic);
         } else {
             throw new BusinessException(ErrorCode.UPDATE_POST_ERROR);
         }
@@ -437,4 +485,5 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
             }
         }
     }
+
 }

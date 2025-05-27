@@ -2,22 +2,18 @@ package com.ljh.fawnhealth.controller;
 
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
-import com.ljh.fawnhealth.context.BaseContext;
-import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.exception.ThrowUtils;
 import com.ljh.fawnhealth.model.entity.CommunityPosts;
 import com.ljh.fawnhealth.model.vo.communityPosts.CommunityPostsVO;
 import com.ljh.fawnhealth.service.CommunityPostsService;
-import com.ljh.fawnhealth.service.CouponsService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 /**
- * 社区帖子控制器
+ * 社区帖子模块
  * 提供社区帖子的增删改查、点赞等功能接口
  */
 @Slf4j
@@ -99,8 +95,8 @@ public class CommunityPostsController {
      * @param communityPosts 帖子实体对象，包含帖子内容、标题等信息
      * @return 统一响应对象，包含新帖子的ID
      */
-    @PostMapping("/publishPost")
-    public BaseResponse<Long> publishPost(@RequestBody CommunityPosts communityPosts) {
+    @PostMapping("/addCommunityPosts")
+    public BaseResponse<Long> addCommunityPosts(@RequestBody CommunityPosts communityPosts) {
         // 设置帖子的发布用户
         communityPosts.setUserId(communityPosts.getUserId());
         Long postId = communityPostsService.publishPost(communityPosts);
@@ -129,8 +125,8 @@ public class CommunityPostsController {
      * @param communityPosts 更新后的帖子实体对象，必须包含帖子ID
      * @return 修改后的帖子视图对象
      */
-    @PostMapping("/updatePost")
-    public BaseResponse<CommunityPostsVO> updatePost(@RequestBody CommunityPosts communityPosts, Long userId) {
+    @PostMapping("/updateCommunityPosts")
+    public BaseResponse<CommunityPostsVO> updateCommunityPosts(@RequestBody CommunityPosts communityPosts, Long userId) {
         // 参数校验
         ThrowUtils.throwIf(communityPosts.getId() == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
 
@@ -148,6 +144,19 @@ public class CommunityPostsController {
     }
 
 
-
+    /**
+     * 获取热点帖子排行榜
+     *
+     * @param topN 需要获取的热点帖子数量
+     * @return 统一响应对象，包含按热度排序的帖子视图对象列表
+     */
+    @GetMapping("/hotRanking")
+    public BaseResponse<List<CommunityPostsVO>> getHotPostRanking(@RequestParam(required = false, defaultValue = "10") int topN) {
+        // 参数校验
+        ThrowUtils.throwIf(topN <= 0, ErrorCode.PARAMS_ERROR, "topN参数必须大于0");
+        // 调用业务层获取热点帖子
+        List<CommunityPostsVO> hotPosts = communityPostsService.getHotPosts(topN);
+        return ResultUtils.success(hotPosts);
+    }
 
 }

@@ -15,6 +15,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 用户模块
+ * 提供用户的登录、注册等功能接口
+ */
 @Slf4j
 @RestController
 @RequestMapping("/user")

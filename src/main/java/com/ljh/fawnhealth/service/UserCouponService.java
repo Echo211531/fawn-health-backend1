@@ -3,7 +3,10 @@ package com.ljh.fawnhealth.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.model.entity.UserCoupon;
+import com.ljh.fawnhealth.model.vo.coupons.UserCouponsVO;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 
 /**
@@ -30,4 +33,6 @@ public interface UserCouponService extends IService<UserCoupon> {
      * @return
      */
     void exchangeCoupon(Long userId, String code);
+
+    List<UserCouponsVO> listUserCoupons(Long userId, Integer status);
 }

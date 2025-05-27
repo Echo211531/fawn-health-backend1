@@ -27,7 +27,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 只拦截后台接口，例如 /admin/** 或后台相关接口
         registry.addInterceptor(jwtTokenAdminInterceptor)
-                .addPathPatterns("/food/**", "/file/**", "/coupons/**", "/user-coupon/**")
+                .addPathPatterns("/foodDiary/**", "/file/**", "/coupons/**", "/user-coupon/**","/communityPosts/**",
+                        "/foodLibrary/**","/vip/**")
                 .excludePathPatterns(
                         "/user/login",
                         "/user/send",

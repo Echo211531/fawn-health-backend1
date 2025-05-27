@@ -14,7 +14,6 @@ import java.util.List;
 @Data
 public class CouponsFormDTO {
 
-
     /**
      * 优惠券id
      */
@@ -47,7 +46,7 @@ public class CouponsFormDTO {
     private Integer thresholdAmount;
 
     /**
-     * 折扣值，满减填抵扣金额；打折填折扣值：80标示打8折
+     * 折扣值，满减填抵扣金额；打折填折扣值：80表示打8折
      */
     private Integer discountValue;
 

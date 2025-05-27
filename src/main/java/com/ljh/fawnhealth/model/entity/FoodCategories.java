@@ -11,6 +11,7 @@ import java.util.Date;
 
 /**
  * 食物库分类表对应的实体类，用于封装食物分类的相关信息。
+ * @TableName food_categories
  */
 @TableName(value ="food_categories")
 @Data

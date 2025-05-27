@@ -2,6 +2,7 @@ package com.ljh.fawnhealth.service.impl;
 
 import cn.hutool.core.bean.copier.CopyOptions;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.ljh.fawnhealth.constant.PromotionConstants;
@@ -14,10 +15,13 @@ import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.model.entity.ExchangeCode;
 import com.ljh.fawnhealth.model.entity.UserCoupon;
 import com.ljh.fawnhealth.model.enums.coupons.ExchangeCodeStatus;
+import com.ljh.fawnhealth.model.enums.coupons.UserCouponStatus;
+import com.ljh.fawnhealth.model.vo.coupons.UserCouponsVO;
 import com.ljh.fawnhealth.mq.MessageProducer;
 import com.ljh.fawnhealth.mq.MqConstant;
 import com.ljh.fawnhealth.service.ExchangeCodeService;
 import com.ljh.fawnhealth.service.UserCouponService;
+import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import com.ljh.fawnhealth.utils.CodeUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +30,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,8 +38,11 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
 * @author 27105
@@ -304,6 +312,61 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             throw e;
         }
     }
+
+    public List<UserCouponsVO> listUserCoupons(Long userId, Integer status) {
+        LambdaQueryWrapper<UserCoupon> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserCoupon::getUserId, userId);
+        if (status != null) {
+            queryWrapper.eq(UserCoupon::getStatus, UserCouponStatus.of(status));
+        }
+        queryWrapper.orderByDesc(UserCoupon::getCreateTime);
+
+        List<UserCoupon> userCoupons = userCouponMapper.selectList(queryWrapper);
+
+        // 获取所有优惠券ID
+        List<Long> couponIds = userCoupons.stream()
+                .map(UserCoupon::getCouponId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<Coupons> coupons;
+        Map<Long, Coupons> couponMap;
+
+        // 判断couponIds是否为空，避免传空集合给selectBatchIds
+        if (couponIds.isEmpty()) {
+            coupons = Collections.emptyList();
+            couponMap = Collections.emptyMap();
+        } else {
+            coupons = couponsMapper.selectBatchIds(couponIds);
+            couponMap = coupons.stream()
+                    .collect(Collectors.toMap(Coupons::getId, c -> c));
+        }
+
+        return userCoupons.stream()
+                .map(userCoupon -> {
+                    UserCouponsVO vo = new UserCouponsVO();
+                    BeanCopyUtils.copy(userCoupon, vo);
+
+                    // 设置状态枚举转int
+                    if (userCoupon.getStatus() != null) {
+                        vo.setStatus(userCoupon.getStatus().getValue());
+                    }
+
+                    Coupons coupons1 = couponMap.get(userCoupon.getCouponId());
+                    if (coupons1 != null) {
+                        vo.setCouponName(coupons1.getName());
+                        vo.setDiscountType(coupons1.getDiscountType());
+                        vo.setThresholdAmount(coupons1.getThresholdAmount());
+                        vo.setMaxDiscountAmount(coupons1.getMaxDiscountAmount());
+                    }
+
+                    return vo;
+                })
+                .collect(Collectors.toList());
+    }
+
+
+
 
 }
 

@@ -35,8 +35,17 @@ public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, Exc
         this.serialOps = redisTemplate.boundValueOps(COUPON_CODE_SERIAL_KEY);
     }
 
+    /**
+     * 异步生成优惠券兑换码
+     * 1. 从Redis获取全局自增序列号作为基础
+     * 2. 批量生成固定长度兑换码并关联优惠券
+     * 3. 持久化到数据库
+     * 4. 更新Redis中优惠券的最大序列号
+     *
+     * @param coupons 优惠券实体
+     */
     @Override
-    @Async("generateExchangeCodeExecutor")
+    @Async("generateExchangeCodeExecutor") // 使用独立线程池异步执行
     public void asyncGenerateCode(Coupons coupons) {
         // 发放数量
         Integer totalNum = coupons.getTotalNum();

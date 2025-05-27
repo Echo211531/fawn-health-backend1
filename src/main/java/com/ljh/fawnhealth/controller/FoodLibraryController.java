@@ -11,15 +11,17 @@ import com.ljh.fawnhealth.model.vo.food.FoodLibraryVO;
 import com.ljh.fawnhealth.service.FoodCategoriesService;
 import com.ljh.fawnhealth.service.FoodLibraryService;
 import jakarta.annotation.Resource;
-import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
+/**
+ * 食物分类模块
+ * 提供食物分类的增删改查等功能接口
+ */
 @Slf4j
 @RestController
-@RequestMapping("/food")
+@RequestMapping("/foodLibrary")
 public class FoodLibraryController {
 
     @Resource

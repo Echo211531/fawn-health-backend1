@@ -20,7 +20,7 @@ public class CouponsQuery extends PageQuery {
     private Integer type;
 
     /**
-     * 优惠券状态，1：待发放，2：发放中，3：已结束, 4：取消/终止
+     * 优惠券状态，1：待发放，2：发放中，3：已结束, 4：暂停
      */
     private Integer status;
 
