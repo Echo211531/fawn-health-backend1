@@ -7,7 +7,15 @@ spring:
   # DashScope API Key 配置
   ai:
     dashscope:
-      api-key: sk-eaafa46f766940c1b53c76a28fc6babc  # 请替换为你的 DashScope API 密钥
+      api-key: xxx  # 请替换为你的 DashScope API 密钥
+      chat:
+        options:
+          model: qwen-plus
+    mcp:
+      client:
+        stdio:
+          servers-configuration: classpath:mcp-servers.json
+
 
   redisson:
     host: ${spring.redisson.host}
@@ -36,16 +44,26 @@ spring:
   data:
     redis:
       database: 0
-      host: localhost
+      host: 110.40.137.152
       port: 6379
-      password: 123456
+      password: 151212
       timeout: 5000
+    mongodb:
+      uri: mongodb://xxx/chat_memory_db
+      username: chat_memory_db
+      password: xxx
 
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/fawn_health?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${spring.datasource.username}
-    password: ${spring.datasource.password}
+    mysql:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/fawn_health?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${spring.datasource.username}
+      password: ${spring.datasource.password}
+    postgres:
+      url: jdbc:postgresql://xxx/vectorstore
+      username: xxx
+      password: xxx
+      driver-class-name: org.postgresql.Driver
 
   mail:
     host: smtp.163.com
@@ -55,7 +73,7 @@ spring:
     password: VWcJ4DkYeYFcnESy
     nickname: 小鹿健康
     default-encoding: UTF-8
-    test-connection: true
+    test-connection: false
     properties:
       mail:
         smtp:
@@ -102,5 +120,10 @@ sky:
     user-token-name: token
 
 
+load:
+  documents:
+    on:
+      startup: true   # 第一次启动设为 true 加载文档
 
-
+zhipu:
+  api-key: xxx

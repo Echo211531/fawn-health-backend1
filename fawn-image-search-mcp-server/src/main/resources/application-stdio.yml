@@ -1,0 +1,13 @@
+spring:
+  ai:
+    mcp:
+      server:
+        name: fawn-image-search-mcp-server
+        version: 0.0.1
+        type: SYNC   #异步
+        # stdio
+        stdio: true  #开启stdio
+  # stdio
+  main:
+    web-application-type: none
+    banner-mode: off

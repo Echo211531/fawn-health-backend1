@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "amap-maps": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@amap/amap-maps-mcp-server"
+      ],
+      "env": {
+        "AMAP_MAPS_API_KEY": "3bb72691d6ce4e4d8a65ac6caee73388"
+      }
+    },
+    "fawn-image-search-mcp-server": {
+      "command": "java",
+      "args": [
+        "-Dspring.ai.mcp.server.stdio=true",
+        "-Dspring.main.web-application-type=none",
+        "-Dlogging.pattern.console=",
+        "-jar",
+        "fawn-image-search-mcp-server/target/fawn-image-search-mcp-server-0.0.1-SNAPSHOT.jar"
+      ],
+      "env": {}
+    }
+  }
+}

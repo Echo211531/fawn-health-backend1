@@ -1,0 +1,125 @@
+package com.ljh.fawnhealth.controller;
+
+import cn.hutool.core.util.StrUtil;
+import com.ljh.fawnhealth.ai.agent.FawnManus;
+import com.ljh.fawnhealth.ai.agent.queue.UserInputQueue;
+import com.ljh.fawnhealth.ai.app.HealthApp;
+import com.ljh.fawnhealth.ai.app.HealthReportApp;
+import com.ljh.fawnhealth.commen.BaseResponse;
+import com.ljh.fawnhealth.exception.ErrorCode;
+import jakarta.annotation.Resource;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
+
+import java.io.IOException;
+
+@RestController
+@RequestMapping("/ai")
+public class AiController {
+
+    @Resource
+    private HealthApp healthApp;
+    @Resource
+    private HealthReportApp healthReportApp;
+
+    @Resource
+    private ToolCallback[] allTools;
+
+    @Resource
+    private ChatModel dashscopeChatModel;
+
+    //流式调用
+    @GetMapping(value = "chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> doChat(String message, String chatId) {
+        return healthApp.doChat(message, chatId);
+    }
+
+    //流式调用：设置泛型为 ServerSentEvent，使用这种方式可以省略 MediaType
+    @GetMapping(value = "/chat/sse")
+    public Flux<ServerSentEvent<String>> doChatWithSSE(String message, String chatId) {
+        return healthApp.doChat(message, chatId)
+                .map(chunk -> ServerSentEvent.<String>builder()
+                        .data(chunk)
+                        .build());
+    }
+
+    //SSE 流式调用
+    // 通过 send 方法持续向 SseEmitter 发送消息(有点像 IO 操作)
+    @GetMapping(value = "/chat/sse_emitter")
+    public SseEmitter doChatWithSseEmitter(String message, String chatId) {
+        // 创建一个超时时间较长的 SseEmitter
+        SseEmitter sseEmitter = new SseEmitter(180000L); // 3 分钟超时
+        // 获取 Flux 响应式数据流并且直接通过订阅推送给 SseEmitter
+        healthApp.doChat(message, chatId)
+                .subscribe(chunk -> {
+                    try {
+                        sseEmitter.send(chunk);
+                    } catch (IOException e) {
+                        sseEmitter.completeWithError(e);
+                    }
+                }, sseEmitter::completeWithError, sseEmitter::complete);
+        // 返回
+        return sseEmitter;
+    }
+
+
+    // 生成健康报告
+    @GetMapping(value = "chat/report")
+    public BaseResponse<HealthReportApp.HealthReport> doChatWithReport(String message, String chatId) {
+        HealthReportApp.HealthReport report =
+                healthReportApp.doChatWithReport(message, chatId);
+        return new BaseResponse<>(ErrorCode.SUCCESS.getCode(), report,
+                ErrorCode.SUCCESS.getMessage());
+    }
+
+    //RAG检索增强
+    @GetMapping(value = "chat/rag", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> doChatWithRag(String message, String chatId) {
+        return healthApp.doChatWithRag(message, chatId);
+    }
+
+    // Mcp 服务
+    @GetMapping(value = "chat/mcp", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> doChatWithMcp(String message, String chatId) {
+        return healthApp.doChatWithMcp(message, chatId);
+    }
+
+    // 流式调用 Manus 超级智能体
+    @GetMapping("/manus/chat")
+    public SseEmitter doChatWithManus(String message) {
+        FawnManus fawnManus = new FawnManus(allTools, dashscopeChatModel);
+        return fawnManus.runStream(message);
+    }
+
+
+    @jakarta.annotation.Resource
+    private UserInputQueue userInputQueue;
+    /**
+     * 询问用户后，用户输入接口后，前端进行调用该接口，把用户输入的内容传递到内容中
+     * @param input 用户输入内容
+     * @return
+     */
+    @GetMapping("/user/input")
+    public void userInput(@RequestParam("input") String input) {
+        // 回答问题
+        try {
+            // 非空判断
+            if (StrUtil.isBlank(input)) {
+                userInputQueue.putResponse("用户输入为空");
+            } else {
+                userInputQueue.putResponse(input);
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+}

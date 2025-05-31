@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: fawn-image-search-mcp-server
+  profiles:
+    active: stdio
+server:
+  port: 8127
