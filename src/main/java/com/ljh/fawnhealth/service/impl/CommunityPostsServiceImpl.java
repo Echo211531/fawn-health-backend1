@@ -9,8 +9,10 @@ import com.ljh.fawnhealth.exception.ThrowUtils;
 import com.ljh.fawnhealth.manager.cache.CacheManager;
 import com.ljh.fawnhealth.mapper.CommunityPostsMapper;
 import com.ljh.fawnhealth.mapper.PostLikesMapper;
+import com.ljh.fawnhealth.mapper.UserMapper;
 import com.ljh.fawnhealth.model.entity.CommunityPosts;
 import com.ljh.fawnhealth.model.entity.PostLikes;
+import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.enums.communityPosts.CommunityPostsType;
 import com.ljh.fawnhealth.model.vo.communityPosts.CommunityPostsVO;
 import com.ljh.fawnhealth.service.CommunityPostsService;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +63,9 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     @Resource
     private CacheManager cacheManager; // 注入缓存管理器
 
+    @Resource
+    private UserMapper userMapper;
+
     /**
      * 查询所有公开的社区帖子（带类型描述转换）
      *
@@ -67,21 +73,36 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
      */
     @Override
     public List<CommunityPostsVO> selectAllCommunityPosts() {
-        // 构造查询条件：仅查询公开且未删除的帖子，按置顶优先级降序、创建时间降序排列
         QueryWrapper<CommunityPosts> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_public", 1)
                 .eq("is_delete", 0)
                 .orderByDesc("is_top")
                 .orderByDesc("create_time");
 
-        // 执行数据库查询
         List<CommunityPosts> posts = communityPostsMapper.selectList(queryWrapper);
 
-        // 将实体类转换为视图对象，并添加类型描述
+        // 批量提取所有 userId，避免一条条查
+        Set<Long> userIds = posts.stream()
+                .map(CommunityPosts::getUserId)
+                .collect(Collectors.toSet());
+
+        // 批量查询用户信息，避免N+1问题
+        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
         return posts.stream()
-                .map(this::convertToVO) // 使用自定义转换方法
+                .map(post -> {
+                    CommunityPostsVO vo = convertToVO(post);
+                    User user = userMap.get(post.getUserId());
+                    if (user != null) {
+                        vo.setNickname(user.getNickname());
+                        vo.setAvatar(user.getAvatar());
+                    }
+                    return vo;
+                })
                 .collect(Collectors.toList());
     }
+
 
     /**
      * 将帖子实体类转换为视图对象（含类型描述）
