@@ -1,6 +1,7 @@
 package com.ljh.fawnhealth.ai.agent;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.lang.UUID;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.ljh.fawnhealth.ai.agent.model.AgentState;
 import lombok.Data;
@@ -20,6 +21,9 @@ import org.springframework.ai.tool.ToolCallback;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_CONVERSATION_ID_KEY;
+import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor.CHAT_MEMORY_RETRIEVE_SIZE_KEY;
+
 /**
  * 处理工具调用的基础代理类，具体实现了 think 和 act 方法，可以用作创建实例的父类  
  */  
@@ -35,8 +39,8 @@ public class ToolCallAgent extends ReActAgent {
     private final ToolCallingManager toolCallingManager;
     // 禁用内置的工具调用机制，自己维护上下文  
     private final ChatOptions chatOptions;
-    
-    public ToolCallAgent(ToolCallback[] availableTools) {  
+
+    public ToolCallAgent(ToolCallback[] availableTools) {
         super();  
         this.availableTools = availableTools;  
         this.toolCallingManager = ToolCallingManager.builder().build();  
@@ -58,22 +62,28 @@ public class ToolCallAgent extends ReActAgent {
             UserMessage userMessage = new UserMessage(getNextStepPrompt());
             getMessageList().add(userMessage);
         }
-        // 2. 构造 Prompt（提示词）
+        // 2.  获取消息列表，构造 Prompt（提示词）
         List<Message> messageList = getMessageList();
         Prompt prompt = new Prompt(messageList, chatOptions);
         try {
             //3. 调用 LLM 模型进行思考
+            //对话记忆的唯一标识
+            String conversantId = UUID.randomUUID().toString();
             // 传入系统提示词、可用工具列表（tools）等信息
             ChatResponse chatResponse = getChatClient().prompt(prompt)
+                    .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, conversantId)
+                            .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
                     .system(getSystemPrompt())
                     .tools(availableTools)
                     .call()
                     .chatResponse();
             //4. 保存响应结果以备后续 Act 行动使用
             this.toolCallChatResponse = chatResponse;
+            // 提取出返回结果信息
             AssistantMessage assistantMessage = chatResponse.getResult().getOutput();
             // 获取助手输出文本和可能的工具调用列表。
             String result = assistantMessage.getText();
+            // 调用工具的集合
             List<AssistantMessage.ToolCall> toolCallList = assistantMessage.getToolCalls();
             //5. 日志记录（便于调试）
             log.info(getName() + "的思考: " + result);

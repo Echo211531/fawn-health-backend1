@@ -81,13 +81,17 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
 
         List<CommunityPosts> posts = communityPostsMapper.selectList(queryWrapper);
 
-        // 批量提取所有 userId，避免一条条查
+        if (posts.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         Set<Long> userIds = posts.stream()
                 .map(CommunityPosts::getUserId)
                 .collect(Collectors.toSet());
 
-        // 批量查询用户信息，避免N+1问题
-        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
+        final Map<Long, User> userMap = userIds.isEmpty()
+                ? Collections.emptyMap()
+                : userMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
         return posts.stream()

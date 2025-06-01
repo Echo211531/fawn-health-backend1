@@ -28,8 +28,8 @@ public abstract class BaseAgent {
     private String name;
 
     // 提示词
-    private String systemPrompt;      // 系统提示词
-    private String nextStepPrompt;    // 下一步骤提示词
+    private String systemPrompt;       // 系统提示词
+    private String nextStepPrompt;     // 下一步骤提示词
 
     // 代理状态
     private AgentState state = AgentState.IDLE;  // 当前状态，默认为闲置

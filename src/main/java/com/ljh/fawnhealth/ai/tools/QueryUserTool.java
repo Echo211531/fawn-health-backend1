@@ -14,8 +14,10 @@ public class QueryUserTool {
     /**
      * 工具方法：向用户提问，并等待用户输入
      */
-    @Tool(description = "向用户提问，并等待用户输入")
-    public String askUserAndWait(@ToolParam(description = "提问问题") String question) {
+    @Tool(description = "当需要用户补充信息时，向用户提问并等待其输入")
+    public String askUserAndWait(
+            @ToolParam(description = "需要用户提供额外信息的问题，例如：'请提供您的年龄' 或 '您希望选择哪个选项？A/B/C'")
+            String question) {
         System.out.println("【系统提问】" + question);
         try {
             // 阻塞等待用户输入

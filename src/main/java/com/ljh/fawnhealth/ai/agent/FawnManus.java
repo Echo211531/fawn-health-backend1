@@ -1,13 +1,19 @@
 package com.ljh.fawnhealth.ai.agent;
 
 import com.ljh.fawnhealth.ai.advisor.MyLoggerAdvisor;
+import com.ljh.fawnhealth.ai.advisor.ProhibitedWordAdvisor;
+import com.ljh.fawnhealth.ai.advisor.ReReadingAdvisor;
+import com.ljh.fawnhealth.ai.store.MongoChatMemory;
+import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FawnManus extends ToolCallAgent {
+
     public FawnManus(ToolCallback[] allTools, ChatModel dashscopeChatModel) {
         super(allTools);  
         this.setName("fawnManus");
@@ -22,13 +28,22 @@ public class FawnManus extends ToolCallAgent {
           根据用户需求，主动选择最合适的工具或工具组合。对于复杂的任务，您可以分解问题并逐步使用不同的工具来解决它。
           使用每个工具后，清楚地解释执行结果并建议后续步骤。
           如果执行任务产生报错，请再次尝试，这有利于提升用户体验
+          如果要在任何时候想要用户补充信息，请使用 'askUserAndWait' 工具调用，等待用户输入信息
           如果要在任何时候停止交互，请使用 'terminate' 工具调用，但是调用之前，确保完成任务的最后一步，不要没有完成任务提前退出
           """;
         this.setNextStepPrompt(NEXT_STEP_PROMPT);
         this.setMaxSteps(20);  
-        // 初始化客户端  
+
+        // 初始化超级智能体客户端
         ChatClient chatClient = ChatClient.builder(dashscopeChatModel)
-            .defaultAdvisors(new MyLoggerAdvisor())
+            .defaultAdvisors(
+                    new MyLoggerAdvisor(), //自定义日志
+                    // 自定义违禁词 Advisor，可按需开启
+                    new ProhibitedWordAdvisor()
+                    //自定义推理增强，可按需开启
+                    //new ReReadingAdvisor()
+                    )
+
             .build();  
         this.setChatClient(chatClient);  
     }  

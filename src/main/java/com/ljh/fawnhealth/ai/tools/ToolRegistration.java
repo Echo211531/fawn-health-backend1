@@ -24,6 +24,8 @@ public class ToolRegistration {
     ZhipuWebSearchTool zhipuWebSearchTool;
     @Resource
     QueryUserTool queryUserTool;
+    @Resource
+    SaveAsMarkdownTool saveAsMarkdownTool;
     /**
      * 注册所有AI工具
      */
@@ -33,6 +35,7 @@ public class ToolRegistration {
         return ToolCallbacks.from(
                 zhipuWebSearchTool,
                 queryUserTool,
+                saveAsMarkdownTool,
                 new WebScrapingTool(),
                 fileOperationTool,
                 databaseOperationTool,

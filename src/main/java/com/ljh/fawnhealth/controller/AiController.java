@@ -121,5 +121,4 @@ public class AiController {
             throw new RuntimeException(e);
         }
     }
-
 }
