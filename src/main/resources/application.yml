@@ -4,10 +4,9 @@ server:
     context-path: /api
 
 spring:
-  # DashScope API Key 配置
   ai:
     dashscope:
-      api-key: xxx  # 请替换为你的 DashScope API 密钥
+      api-key: ${spring.ai.dashscope.api-key}
       chat:
         options:
           model: qwen-plus
@@ -15,7 +14,6 @@ spring:
       client:
         stdio:
           servers-configuration: classpath:mcp-servers.json
-
 
   redisson:
     host: ${spring.redisson.host}
@@ -28,49 +26,47 @@ spring:
     port: ${spring.rabbitmq.port}
     username: ${spring.rabbitmq.username}
     password: ${spring.rabbitmq.password}
-    # 开启confirm机制
     publisher-confirm-type: correlated
-    # 开启return机制
     publisher-returns: true
-    #全局配置，局部配置存在就以局部为准
     listener:
       simple:
-        acknowledge-mode: manual # 手动ACK
+        acknowledge-mode: manual
 
   profiles:
     active: local
   application:
     name: fawn-health
+
   data:
     redis:
-      database: 0
-      host: 110.40.137.152
-      port: 6379
-      password: 151212
+      database: ${spring.data.redis.database}
+      host: ${spring.data.redis.host}
+      port: ${spring.data.redis.port}
+      password: ${spring.data.redis.password}
       timeout: 5000
     mongodb:
-      uri: mongodb://xxx/chat_memory_db
-      username: chat_memory_db
-      password: xxx
+      uri: ${spring.data.mongodb.uri}
+      username: ${spring.data.mongodb.username}
+      password: ${spring.data.mongodb.password}
 
   datasource:
     mysql:
       driver-class-name: com.mysql.cj.jdbc.Driver
-      url: jdbc:mysql://localhost:3306/fawn_health?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      url: ${spring.datasource.mysql.url}
       username: ${spring.datasource.username}
       password: ${spring.datasource.password}
     postgres:
-      url: jdbc:postgresql://xxx/vectorstore
-      username: xxx
-      password: xxx
+      url: ${spring.datasource.postgres.url}
+      username: ${spring.datasource.postgres.username}
+      password: ${spring.datasource.postgres.password}
       driver-class-name: org.postgresql.Driver
 
   mail:
     host: smtp.163.com
     protocol: smtps
     port: 587
-    username: 15826333626@163.com
-    password: VWcJ4DkYeYFcnESy
+    username: ${spring.mail.username}
+    password: ${spring.mail.password}
     nickname: 小鹿健康
     default-encoding: UTF-8
     test-connection: false
@@ -82,7 +78,27 @@ spring:
             enable: true
             required: true
 
-  # Springdoc OpenAPI配置
+ali:
+  oss:
+    endpoint: ${ali.oss.endpoint}
+    access-key-id: ${ali.oss.access-key-id}
+    access-key-secret: ${ali.oss.access-key-secret}
+    bucket-name: ${ali.oss.bucket-name}
+
+sky:
+  jwt:
+    user-secret-key: ${sky.jwt.user-secret-key}
+    user-ttl: 7200000
+    user-token-name: token
+
+load:
+  documents:
+    on:
+      startup: true
+
+zhipu:
+  api-key: ${zhipu.api-key}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -95,35 +111,7 @@ springdoc:
       paths-to-match: '/**'
       packages-to-scan: com.ljh.fawnhealth.controller
 
-  # Knife4j配置
 knife4j:
   enable: true
   setting:
     language: zh_cn
-
-  # OSS配置
-ali:
-  oss:
-    endpoint: ${ali.oss.endpoint}
-    access-key-id: ${ali.oss.access-key-id}
-    access-key-secret: ${ali.oss.access-key-secret}
-    bucket-name: ${ali.oss.bucket-name}
-
-
-sky:
-  jwt:
-    # jwt秘钥
-    user-secret-key: fawnhealth
-    # 过期时间
-    user-ttl: 7200000
-    # 前端传过来的令牌名称，可以改变和前端商量
-    user-token-name: token
-
-
-load:
-  documents:
-    on:
-      startup: true   # 第一次启动设为 true 加载文档
-
-zhipu:
-  api-key: xxx
