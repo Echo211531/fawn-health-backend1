@@ -61,6 +61,8 @@ public class VipOrdersServiceImpl extends ServiceImpl<VipOrdersMapper, VipOrders
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "VIP价格不能为负数或零");
         }
 
+
+
         // 3. 计算最终金额（固定无折扣）
         BigDecimal finalAmount = basePrice;
 
@@ -94,8 +96,9 @@ public class VipOrdersServiceImpl extends ServiceImpl<VipOrdersMapper, VipOrders
         return VipOrderCreateVO.builder()
                 .orderId(order.getId())
                 .orderNo(order.getOrderNo())
-                .success(true)
                 .paymentAmount(finalAmount)
+                .createTime(new Date())
+                .orderNo(dto.getRemark())
                 .qrCode(qrCodeBase64) // 新增二维码字段
                 .discountAmount(BigDecimal.ZERO)
                 .paymentUrl(payUrlWithNote)

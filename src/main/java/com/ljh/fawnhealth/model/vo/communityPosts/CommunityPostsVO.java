@@ -20,6 +20,16 @@ public class CommunityPostsVO {
     private Long userId;
 
     /**
+     * 用户昵称
+     */
+    private String nickname;
+
+    /**
+     * 头像URL
+     */
+    private String avatar;
+
+    /**
      * 标题
      */
     private String title;

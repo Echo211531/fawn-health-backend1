@@ -25,4 +25,9 @@ public class VipOrderCreateDTO {
      * 取值：1-微信支付，2-支付宝，3-苹果支付
      */
     private Integer paymentMethod;
+
+    /**
+     * 订单备注
+     */
+    private String remark;
 }
