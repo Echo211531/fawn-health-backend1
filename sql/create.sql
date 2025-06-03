@@ -340,3 +340,38 @@ CREATE TABLE `vip_benefits` (
 
 ALTER TABLE `vip_benefits`
     ADD COLUMN `price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '权益价格（针对单独购买场景）' AFTER `benefit_name`;
+
+CREATE TABLE `comments` (
+                            `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '评论ID',
+                            `post_id` BIGINT NOT NULL COMMENT '帖子ID',
+                            `user_id` BIGINT NOT NULL COMMENT '评论用户ID',
+                            `parent_id` BIGINT NOT NULL DEFAULT 0 COMMENT '父评论ID，0 表示一级评论',
+                            `root_id` BIGINT NOT NULL DEFAULT 0 COMMENT '根评论ID，指向一级评论，便于树结构检索',
+                            `reply_to_user_id` BIGINT DEFAULT NULL COMMENT '被回复的用户ID，用于展示 @xxx',
+                            `content` TEXT NOT NULL COMMENT '评论内容',
+                            `like_count` INT NOT NULL DEFAULT 0 COMMENT '点赞数',
+                            `is_author` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否作者回复:0否,1是',
+                            `status` TINYINT NOT NULL DEFAULT 0 COMMENT '评论状态：0正常，1待审，2屏蔽/违规',
+                            `is_delete` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除:0否,1是',
+                            `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                            `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                            PRIMARY KEY (`id`),
+                            KEY `idx_post_id` (`post_id`),
+                            KEY `idx_user_id` (`user_id`),
+                            KEY `idx_parent_id` (`parent_id`),
+                            KEY `idx_root_id` (`root_id`),
+                            KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论表（支持多级嵌套与审核）';
+
+
+CREATE TABLE `comment_likes` (
+                                 `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
+                                 `comment_id` BIGINT NOT NULL COMMENT '评论ID',
+                                 `user_id` BIGINT NOT NULL COMMENT '点赞用户ID',
+                                 `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '点赞时间',
+                                 `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                 `is_delete` TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除:0否,1是（取消点赞）',
+                                 PRIMARY KEY (`id`),
+                                 UNIQUE KEY `uk_comment_user` (`comment_id`, `user_id`),
+                                 KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论点赞表';

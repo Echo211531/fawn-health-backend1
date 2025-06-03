@@ -12,6 +12,9 @@ import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 布隆过滤器
+ */
 @Component
 public class PostBloomFilterManager implements InitializingBean {
 

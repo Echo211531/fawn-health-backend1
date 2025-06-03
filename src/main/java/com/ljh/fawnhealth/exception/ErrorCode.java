@@ -47,6 +47,12 @@ public enum ErrorCode {
     POST_TYPE_ERROR(40404, "帖子类型错误"),
     ADD_POST_ERROR(40405,"发帖失败"),
     UPDATE_POST_ERROR(40406,"帖子修改失败"),
+    NOT_FOUND_ERROR(40407,"评论不存在或所属帖子不存在"),
+    NO_COMMENTS_AUTH_ERROR(40409,"无权限删除该评论"),
+    COMMENT_POST_NOT_FOUND(40410, "评论失败，目标帖子不存在"),
+    COMMENT_PARENT_INVALID(40010, "回复失败，父评论不存在或不属于同一帖子"),
+    COMMENT_REPLY_USER_REQUIRED(40011, "回复失败，二级评论必须指定被回复的用户"),
+
 
     // 系统与会员相关错误码 40500 - 40600
     VIP_ORDER_NOT_FOUND(40500, "会员订单不存在"),

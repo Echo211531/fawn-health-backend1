@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.CommentsMapper">
+
+    <!-- 点赞数 +1 -->
+    <update id="increaseLikeCount">
+        UPDATE comments
+        SET like_count = like_count + 1
+        WHERE id = #{commentId}
+    </update>
+
+    <!-- 点赞数 -1，不能小于0 -->
+    <update id="decreaseLikeCount">
+        UPDATE comments
+        SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END
+        WHERE id = #{commentId}
+    </update>
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Comments">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="postId" column="post_id" jdbcType="BIGINT"/>
+            <result property="userId" column="user_id" jdbcType="BIGINT"/>
+            <result property="parentId" column="parent_id" jdbcType="BIGINT"/>
+            <result property="rootId" column="root_id" jdbcType="BIGINT"/>
+            <result property="replyToUserId" column="reply_to_user_id" jdbcType="BIGINT"/>
+            <result property="content" column="content" jdbcType="VARCHAR"/>
+            <result property="likeCount" column="like_count" jdbcType="INTEGER"/>
+            <result property="isAuthor" column="is_author" jdbcType="TINYINT"/>
+            <result property="status" column="status" jdbcType="TINYINT"/>
+            <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,post_id,user_id,
+        parent_id,root_id,reply_to_user_id,
+        content,like_count,is_author,
+        status,is_delete,create_time,
+        update_time
+    </sql>
+</mapper>

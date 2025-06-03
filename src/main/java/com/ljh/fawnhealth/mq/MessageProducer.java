@@ -1,13 +1,9 @@
 package com.ljh.fawnhealth.mq;
 
-
-//import com.ljh.fawnhealth.config.RabbitMQConfig;
 import com.ljh.fawnhealth.model.dto.coupons.UserCouponDTO;
 import jakarta.annotation.Resource;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
-
-
 
 @Component
 public class MessageProducer {
@@ -17,6 +13,7 @@ public class MessageProducer {
 
     /**
      * 发送消息
+     *
      * @param exchange
      * @param routingKey
      * @param userCouponDTO
@@ -25,4 +22,14 @@ public class MessageProducer {
         rabbitTemplate.convertAndSend(exchange, routingKey, userCouponDTO);
     }
 
+    /**
+     * 发送任何类型消息
+     *
+     * @param exchange
+     * @param routingKey
+     * @param message
+     */
+    public void sendMessage(String exchange, String routingKey, Object message) {
+        rabbitTemplate.convertAndSend(exchange, routingKey, message);
+    }
 }

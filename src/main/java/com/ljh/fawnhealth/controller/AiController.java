@@ -102,6 +102,7 @@ public class AiController {
 
     @jakarta.annotation.Resource
     private UserInputQueue userInputQueue;
+
     /**
      * 询问用户后，用户输入接口后，前端进行调用该接口，把用户输入的内容传递到内容中
      * @param input 用户输入内容
