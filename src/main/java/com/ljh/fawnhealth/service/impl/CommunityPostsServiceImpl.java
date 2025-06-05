@@ -1,6 +1,7 @@
 package com.ljh.fawnhealth.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.constant.CommunityPostsConstant;
 import com.ljh.fawnhealth.exception.BusinessException;
@@ -181,69 +182,6 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
 
 
     /**
-     * 点赞帖子（支持重复点赞自动判断，含事务和缓存更新）
-     *
-     * @param postId 帖子ID
-     * @param userId 用户ID
-     * @return 点赞操作是否成功
-     */
-    @Override
-    @Transactional // 声明事务保证数据库操作一致性
-    public boolean likeCommunityPosts(Long postId, Long userId) {
-        // 布隆过滤器提前过滤无效帖子ID（减少数据库查询压力）
-        if (!postBloomFilterManager.mightContain(postId)) {
-            ThrowUtils.throwIf(true, ErrorCode.COMMUNITY_POST_NOT_FOUND); // 帖子不存在则抛出异常
-        }
-
-        // 查询帖子是否存在（双重校验，确保数据一致性）
-        CommunityPosts post = communityPostsMapper.selectById(postId);
-        ThrowUtils.throwIf(post == null, ErrorCode.COMMUNITY_POST_NOT_FOUND); // 再次校验帖子存在
-
-        // 查询用户对该帖子的历史点赞记录
-        QueryWrapper<PostLikes> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("post_id", postId).eq("user_id", userId);
-        PostLikes existingLike = postLikesMapper.selectOne(queryWrapper);
-
-        boolean success = false;
-
-        if (existingLike != null) {
-            if (existingLike.getIsDelete() == 0) {
-                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "请勿重复点赞");
-            } else {
-                existingLike.setIsDelete(0);
-                existingLike.setUpdateTime(new Date());
-                success = postLikesMapper.updateById(existingLike) > 0;
-            }
-        } else {
-            PostLikes like = new PostLikes();
-            like.setPostId(postId);
-            like.setUserId(userId);
-            like.setCreateTime(new Date());
-            like.setUpdateTime(new Date());
-            like.setIsDelete(0);
-            success = postLikesMapper.insert(like) > 0;
-        }
-
-        // 异步更新缓存和热点统计
-        if (success) {
-            redisExecutor.execute(() -> {
-                // 更新用户点赞记录
-                String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
-                redisTemplate.opsForHash().put(redisKey, postId.toString(), true);
-                redisTemplate.expire(redisKey, CommunityPostsConstant.USER_POSTS_LIKE_EXPIRE_TIME, TimeUnit.SECONDS);
-
-                // 使用CacheManager记录热点（计数+1）
-                cacheManager.get(
-                        CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
-                        postId.toString()
-                );
-            });
-        }
-
-        return success;
-    }
-
-    /**
      * 获取热点帖子列表
      * 使用HeavyKeeper算法获取TopK热点
      */
@@ -279,42 +217,250 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     }
 
     /**
-     * 取消点赞帖子（含事务和缓存更新）
+     * 点赞/取消点赞帖子（自动判断当前状态）
      *
      * @param postId 帖子ID
      * @param userId 用户ID
-     * @return 取消操作是否成功
+     * @return 新的点赞状态（true=已点赞，false=未点赞）
      */
     @Override
-    public boolean unlikeCommunityPosts(Long postId, Long userId) {
-        // 使用布隆过滤器快速判断帖子是否可能存在（减少无效查询）
+    @Transactional
+    public boolean toggleLike(Long postId, Long userId) {
+        // 参数校验
+        ThrowUtils.throwIf(postId == null || userId == null, ErrorCode.PARAMS_ERROR);
+
+        // 布隆过滤器校验帖子是否存在
         if (!postBloomFilterManager.mightContain(postId)) {
-            ThrowUtils.throwIf(true, ErrorCode.COMMUNITY_POST_NOT_FOUND); // 帖子不存在则抛出异常
+            throw new BusinessException(ErrorCode.COMMUNITY_POST_NOT_FOUND);
         }
 
-        // 查询有效的点赞记录（is_delete=0表示未取消）
+        // 查询帖子
+        CommunityPosts post = communityPostsMapper.selectById(postId);
+        ThrowUtils.throwIf(post == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
+
+        // 查询用户当前点赞状态
+        String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
+        Boolean isLiked = redisTemplate.opsForHash().hasKey(redisKey, postId.toString());
+
+        boolean newLikeState;
+
+        if (Boolean.TRUE.equals(isLiked)) {
+            // 当前已点赞 -> 执行取消点赞
+            cancelLike(postId, userId);
+            newLikeState = false;
+        } else {
+            // 当前未点赞 -> 执行点赞
+            addLike(postId, userId);
+            newLikeState = true;
+        }
+
+        return newLikeState;
+    }
+
+    /**
+     * 执行点赞操作
+     */
+    private void addLike(Long postId, Long userId) {
+        // 查询用户对该帖子的历史点赞记录
+        QueryWrapper<PostLikes> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("post_id", postId).eq("user_id", userId);
+        PostLikes existingLike = postLikesMapper.selectOne(queryWrapper);
+
+        if (existingLike != null) {
+            // 恢复已取消的点赞
+            existingLike.setIsDelete(0);
+            existingLike.setUpdateTime(new Date());
+            postLikesMapper.updateById(existingLike);
+        } else {
+            // 新增点赞记录
+            PostLikes like = new PostLikes();
+            like.setPostId(postId);
+            like.setUserId(userId);
+            like.setCreateTime(new Date());
+            like.setUpdateTime(new Date());
+            like.setIsDelete(0);
+            postLikesMapper.insert(like);
+        }
+
+        // 异步更新缓存和点赞数
+        asyncUpdateLikeStatus(postId, userId, true);
+    }
+
+    /**
+     * 执行取消点赞操作
+     */
+    private void cancelLike(Long postId, Long userId) {
+        // 查询有效的点赞记录
         QueryWrapper<PostLikes> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("post_id", postId)
                 .eq("user_id", userId)
-                .eq("is_delete", 0); // 仅查询未取消的点赞记录
+                .eq("is_delete", 0);
         PostLikes like = postLikesMapper.selectOne(queryWrapper);
-        ThrowUtils.throwIf(like == null, ErrorCode.OPERATION_ERROR, "请勿重复取消点赞"); // 校验存在有效点赞记录
 
-        // 标记为取消点赞（软删除）
-        like.setIsDelete(1); // 标记为已取消
-        like.setUpdateTime(new Date()); // 更新操作时间
-        int rows = postLikesMapper.updateById(like); // 执行更新操作
+        if (like != null) {
+            // 标记为已取消
+            like.setIsDelete(1);
+            like.setUpdateTime(new Date());
+            postLikesMapper.updateById(like);
 
-        // 异步删除Redis缓存中的点赞记录
-        if (rows > 0) {
-            redisExecutor.execute(() -> {
-                String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
-                redisTemplate.opsForHash().delete(redisKey, postId.toString()); // 从Hash中移除对应field
-            });
+            // 异步更新缓存和点赞数
+            asyncUpdateLikeStatus(postId, userId, false);
         }
-
-        return rows > 0;
     }
+
+    /**
+     * 异步更新点赞状态和缓存
+     */
+    private void asyncUpdateLikeStatus(Long postId, Long userId, boolean isLike) {
+        redisExecutor.execute(() -> {
+            String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
+
+            if (isLike) { // 点赞操作
+                // 更新用户点赞记录（使用Hash结构存储用户点赞的帖子ID）
+                redisTemplate.opsForHash().put(redisKey, postId.toString(), true);
+                redisTemplate.expire(redisKey, CommunityPostsConstant.USER_POSTS_LIKE_EXPIRE_TIME, TimeUnit.SECONDS);
+
+                // 记录热点（用于热门帖子排序）
+                cacheManager.get(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, postId.toString());
+
+                // 原子更新帖子点赞数（+1）
+                communityPostsMapper.update(
+                        null,
+                        new UpdateWrapper<CommunityPosts>()
+                                .setSql("like_count = like_count + 1")
+                                .eq("id", postId)
+                );
+            } else { // 取消点赞操作
+                // 删除用户点赞记录
+                redisTemplate.opsForHash().delete(redisKey, postId.toString());
+
+                // 原子更新帖子点赞数（-1）
+                communityPostsMapper.update(
+                        null,
+                        new UpdateWrapper<CommunityPosts>()
+                                .setSql("like_count = like_count - 1")
+                                .eq("id", postId)
+                );
+            }
+        });
+    }
+
+
+
+//    /**
+//     * 点赞帖子（支持重复点赞自动判断，含事务和缓存更新）
+//     *
+//     * @param postId 帖子ID
+//     * @param userId 用户ID
+//     * @return 点赞操作是否成功
+//     */
+//    @Override
+//    @Transactional // 声明事务保证数据库操作一致性
+//    public boolean likeCommunityPosts(Long postId, Long userId) {
+//        // 布隆过滤器提前过滤无效帖子ID（减少数据库查询压力）
+//        if (!postBloomFilterManager.mightContain(postId)) {
+//            ThrowUtils.throwIf(true, ErrorCode.COMMUNITY_POST_NOT_FOUND); // 帖子不存在则抛出异常
+//        }
+//
+//        // 查询帖子是否存在（双重校验，确保数据一致性）
+//        CommunityPosts post = communityPostsMapper.selectById(postId);
+//        ThrowUtils.throwIf(post == null, ErrorCode.COMMUNITY_POST_NOT_FOUND); // 再次校验帖子存在
+//
+//        // 查询用户对该帖子的历史点赞记录
+//        QueryWrapper<PostLikes> queryWrapper = new QueryWrapper<>();
+//        queryWrapper.eq("post_id", postId).eq("user_id", userId);
+//        PostLikes existingLike = postLikesMapper.selectOne(queryWrapper);
+//
+//        boolean success = false;
+//
+//        if (existingLike != null) {
+//            if (existingLike.getIsDelete() == 0) {
+//                ThrowUtils.throwIf(true, ErrorCode.OPERATION_ERROR, "请勿重复点赞");
+//            } else {
+//                existingLike.setIsDelete(0);
+//                existingLike.setUpdateTime(new Date());
+//                success = postLikesMapper.updateById(existingLike) > 0;
+//            }
+//        } else {
+//            PostLikes like = new PostLikes();
+//            like.setPostId(postId);
+//            like.setUserId(userId);
+//            like.setCreateTime(new Date());
+//            like.setUpdateTime(new Date());
+//            like.setIsDelete(0);
+//            success = postLikesMapper.insert(like) > 0;
+//        }
+//
+//        // 异步更新缓存和热点统计
+//        // 修改后（新增点赞数+1）
+//        if (success) {
+//            redisExecutor.execute(() -> {
+//                // 原有逻辑
+//                String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
+//                redisTemplate.opsForHash().put(redisKey, postId.toString(), true);
+//                redisTemplate.expire(redisKey, CommunityPostsConstant.USER_POSTS_LIKE_EXPIRE_TIME, TimeUnit.SECONDS);
+//                cacheManager.get(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, postId.toString());
+//
+//                // **新增：原子更新帖子点赞数（+1）**
+//                communityPostsMapper.update(
+//                        null,
+//                        new UpdateWrapper<CommunityPosts>()
+//                                .setSql("like_count = like_count + 1")
+//                                .eq("id", postId)
+//                );
+//            });
+//        }
+//
+//        return success;
+//    }
+//
+//    /**
+//     * 取消点赞帖子（含事务和缓存更新）
+//     *
+//     * @param postId 帖子ID
+//     * @param userId 用户ID
+//     * @return 取消操作是否成功
+//     */
+//    @Override
+//    public boolean unlikeCommunityPosts(Long postId, Long userId) {
+//        // 使用布隆过滤器快速判断帖子是否可能存在（减少无效查询）
+//        if (!postBloomFilterManager.mightContain(postId)) {
+//            ThrowUtils.throwIf(true, ErrorCode.COMMUNITY_POST_NOT_FOUND); // 帖子不存在则抛出异常
+//        }
+//
+//        // 查询有效的点赞记录（is_delete=0表示未取消）
+//        QueryWrapper<PostLikes> queryWrapper = new QueryWrapper<>();
+//        queryWrapper.eq("post_id", postId)
+//                .eq("user_id", userId)
+//                .eq("is_delete", 0); // 仅查询未取消的点赞记录
+//        PostLikes like = postLikesMapper.selectOne(queryWrapper);
+//        ThrowUtils.throwIf(like == null, ErrorCode.OPERATION_ERROR, "请勿重复取消点赞"); // 校验存在有效点赞记录
+//
+//        // 标记为取消点赞（软删除）
+//        like.setIsDelete(1); // 标记为已取消
+//        like.setUpdateTime(new Date()); // 更新操作时间
+//        int rows = postLikesMapper.updateById(like); // 执行更新操作
+//
+//        // 异步删除Redis缓存中的点赞记录
+//        // 修改后（新增点赞数-1）
+//        if (rows > 0) {
+//            redisExecutor.execute(() -> {
+//                // 原有逻辑
+//                String redisKey = CommunityPostsConstant.USER_POSTS_KEY_PREFIX + userId;
+//                redisTemplate.opsForHash().delete(redisKey, postId.toString());
+//
+//                // **新增：原子更新帖子点赞数（-1）**
+//                communityPostsMapper.update(
+//                        null,
+//                        new UpdateWrapper<CommunityPosts>()
+//                                .setSql("like_count = like_count - 1")
+//                                .eq("id", postId)
+//                );
+//            });
+//        }
+//
+//        return rows > 0;
+//    }
 
     /**
      * 判断用户是否点赞过某帖子（优先查询Redis缓存）

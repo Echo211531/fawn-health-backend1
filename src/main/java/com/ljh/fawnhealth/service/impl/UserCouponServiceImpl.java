@@ -201,7 +201,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             UserCouponDTO uc = new UserCouponDTO();
             uc.setUserId(userId);
             uc.setCouponId(couponsId);
-            messageProducer.sendMessage(MqConstant.FH_EXCHANGE_NAME, MqConstant.FH_ROUTING_KEY, uc);
+            messageProducer.sendCouponMessage(MqConstant.FH_ROUTING_KEY, uc);
 
             return result;
         } finally {

@@ -2,79 +2,147 @@ package com.ljh.fawnhealth.handler;
 
 import com.ljh.fawnhealth.mapper.CommentLikesMapper;
 import com.ljh.fawnhealth.mapper.CouponsMapper;
+import com.rabbitmq.client.Channel;
 import com.ljh.fawnhealth.model.dto.comments.LikeEventDTO;
 import com.ljh.fawnhealth.model.dto.coupons.UserCouponDTO;
 import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.mq.MqConstant;
-import com.ljh.fawnhealth.service.CommentsService;
 import com.ljh.fawnhealth.service.UserCouponService;
 import jakarta.annotation.Resource;
-import lombok.RequiredArgsConstructor;
-import org.springframework.amqp.core.ExchangeTypes;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-@RequiredArgsConstructor
+import java.io.IOException;
+
+@Slf4j
 @Component
 public class PromotionMqHandler {
 
     @Resource
     private UserCouponService userCouponService;
-
     @Resource
     private CouponsMapper couponsMapper;
-
     @Resource
     private CommentLikesMapper commentLikesMapper;
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = MqConstant.FH_QUEUE_NAME, durable = "true"),
-            exchange = @Exchange(name = MqConstant.FH_EXCHANGE_NAME, type = ExchangeTypes.TOPIC),
-            key = MqConstant.FH_ROUTING_KEY
-    ))
-    public void listenCouponReceiveMessage(UserCouponDTO uc) {
+    /**
+     * 优惠券消息消费者
+     *
+     * @param couponDTO
+     * @param channel
+     * @param deliveryTag
+     */
+    @RabbitListener(queues = MqConstant.FH_QUEUE_NAME)
+    public void handleCouponMessage(UserCouponDTO couponDTO, Channel channel,
+                                    @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
         try {
-            Long couponId = uc.getCouponId();
-            Coupons coupons = couponsMapper.selectById(couponId);
-            Long userId = uc.getUserId();
-            userCouponService.checkAndCreateUserCoupon(coupons, userId, null);
+            log.info("收到优惠券消息: {}", couponDTO);
+
+            // 业务逻辑处理
+            Coupons coupon = couponsMapper.selectById(couponDTO.getCouponId());
+            userCouponService.checkAndCreateUserCoupon(coupon, couponDTO.getUserId(), null);
+
+            // 手动确认消息
+            channel.basicAck(deliveryTag, false);
+            log.info("优惠券消息处理成功");
         } catch (Exception e) {
-            // 记录日志
-            System.err.println("处理消息时出现异常: " + e.getMessage());
-            // 可以根据具体情况进行其他处理，如重试、发送告警等
+            log.error("处理优惠券消息失败: {}", e.getMessage(), e);
+            try {
+                // 拒绝消息并发送到死信队列
+                channel.basicNack(deliveryTag, false, false);
+            } catch (IOException ex) {
+                log.error("发送 NACK 失败: {}", ex.getMessage());
+            }
         }
     }
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = MqConstant.COMMENT_LIKE_QUEUE_NAME, durable = "true"),
-            exchange = @Exchange(name = MqConstant.FH_EXCHANGE_NAME, type = ExchangeTypes.TOPIC),
-            key = MqConstant.COMMENT_LIKE_ROUTING_KEY
-    ))
-    public void listenLikeMessage(LikeEventDTO likeEvent) {
+    /**
+     * 点赞消息消费者
+     *
+     * @param likeEvent
+     * @param channel
+     * @param deliveryTag
+     */
+    @RabbitListener(queues = MqConstant.COMMENT_LIKE_QUEUE_NAME)
+    public void handleLikeMessage(LikeEventDTO likeEvent, Channel channel,
+                                  @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
         try {
-            Long commentId = likeEvent.getCommentId();
-            Long userId = likeEvent.getUserId();
-            Boolean liked = likeEvent.getLiked();
+            log.info("收到点赞消息: {}", likeEvent);
 
-            if (liked != null) {
-                if (liked) {
-                    // 点赞：插入或更新为未删除状态
-                    commentLikesMapper.upsertLike(commentId, userId);
+            // 业务逻辑处理
+            if (likeEvent.getLiked() != null) {
+                if (likeEvent.getLiked()) {
+                    commentLikesMapper.upsertLike(likeEvent.getCommentId(), likeEvent.getUserId());
                 } else {
-                    // 取消点赞：逻辑删除
-                    commentLikesMapper.markDeleted(commentId, userId);
+                    commentLikesMapper.markDeleted(likeEvent.getCommentId(), likeEvent.getUserId());
                 }
             }
 
-            System.out.println("处理点赞消息（落库）: " + likeEvent);
+            // 手动确认消息
+            channel.basicAck(deliveryTag, false);
+            log.info("点赞消息处理成功");
         } catch (Exception e) {
-            System.err.println("处理点赞消息异常: " + e.getMessage());
+            log.error("处理点赞消息失败: {}", e.getMessage(), e);
+            try {
+                // 拒绝消息并发送到死信队列
+                channel.basicNack(deliveryTag, false, false);
+            } catch (IOException ex) {
+                log.error("发送 NACK 失败: {}", ex.getMessage());
+            }
         }
     }
 
+    /**
+     * 优惠券死信队列消费者
+     *
+     * @param message
+     */
+    @RabbitListener(queues = MqConstant.FH_DLQ_QUEUE_NAME)
+    public void handleCouponDlqMessage(Message message) {
+        try {
+            String body = new String(message.getBody());
+            log.error("优惠券死信消息: {}", body);
 
+            // 获取异常信息
+            String exceptionMessage = (String) message.getMessageProperties().getHeaders().get("x-exception-message");
+            String stackTrace = (String) message.getMessageProperties().getHeaders().get("x-exception-stacktrace");
 
+            log.error("异常原因: {}", exceptionMessage);
+            if (stackTrace != null) {
+                log.error("堆栈信息: {}", stackTrace);
+            }
+            //todo 可以添加人工干预逻辑，如发送邮件、短信通知
+        } catch (Exception e) {
+            log.error("处理优惠券死信消息异常: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 点赞死信队列消费者
+     *
+     * @param message
+     */
+    @RabbitListener(queues = MqConstant.LIKE_DLQ_QUEUE_NAME)
+    public void handleLikeDlqMessage(Message message) {
+        try {
+            String body = new String(message.getBody());
+            log.error("点赞死信消息: {}", body);
+
+            // 获取异常信息
+            String exceptionMessage = (String) message.getMessageProperties().getHeaders().get("x-exception-message");
+            String stackTrace = (String) message.getMessageProperties().getHeaders().get("x-exception-stacktrace");
+
+            log.error("异常原因: {}", exceptionMessage);
+            if (stackTrace != null) {
+                log.error("堆栈信息: {}", stackTrace);
+            }
+            //todo 可以添加人工干预逻辑，如发送邮件、短信通知
+        } catch (Exception e) {
+            log.error("处理点赞死信消息异常: {}", e.getMessage(), e);
+        }
+    }
 }

@@ -59,34 +59,55 @@ public class CommunityPostsController {
         return ResultUtils.success(postVO);
     }
 
-    /**
-     * 帖子点赞接口
-     *
-     * @param postId 被点赞的帖子ID
-     * @param userId 执行点赞操作的用户ID
-     * @return 统一响应对象，包含操作结果（成功/失败）
-     */
-    @PostMapping("/likeCommunityPosts")
-    public BaseResponse<Boolean> likeCommunityPosts(@RequestParam Long postId, Long userId) {
-        // 校验用户ID是否存在
-        ThrowUtils.throwIf(userId == null, ErrorCode.USER_NOTFOUND);
-        boolean result = communityPostsService.likeCommunityPosts(postId, userId);
-        return ResultUtils.success(result);
-    }
+//    /**
+//     * 帖子点赞接口
+//     *
+//     * @param postId 被点赞的帖子ID
+//     * @param userId 执行点赞操作的用户ID
+//     * @return 统一响应对象，包含操作结果（成功/失败）
+//     */
+//    @PostMapping("/likeCommunityPosts")
+//    public BaseResponse<Boolean> likeCommunityPosts(@RequestParam Long postId, Long userId) {
+//        // 校验用户ID是否存在
+//        ThrowUtils.throwIf(userId == null, ErrorCode.USER_NOTFOUND);
+//        boolean result = communityPostsService.likeCommunityPosts(postId, userId);
+//        return ResultUtils.success(result);
+//    }
+
+//    /**
+//     * 取消帖子点赞接口
+//     *
+//     * @param postId 被取消点赞的帖子ID
+//     * @param userId 执行取消点赞操作的用户ID
+//     * @return 统一响应对象，包含操作结果（成功/失败）
+//     */
+//    @PostMapping("/unlikeCommunityPosts")
+//    public BaseResponse<Boolean> unlikeCommunityPosts(@RequestParam Long postId, Long userId) {
+//        // 校验用户ID是否存在
+//        ThrowUtils.throwIf(userId == null, ErrorCode.USER_NOTFOUND);
+//        boolean result = communityPostsService.unlikeCommunityPosts(postId, userId);
+//        return ResultUtils.success(result);
+//    }
 
     /**
-     * 取消帖子点赞接口
+     * 点赞/取消点赞帖子（无需额外参数，自动判断状态）
      *
-     * @param postId 被取消点赞的帖子ID
-     * @param userId 执行取消点赞操作的用户ID
-     * @return 统一响应对象，包含操作结果（成功/失败）
+     * @param postId 帖子ID
+     * @param userId 用户ID
+     * @return 操作结果（true=点赞，false=取消点赞）
      */
-    @PostMapping("/unlikeCommunityPosts")
-    public BaseResponse<Boolean> unlikeCommunityPosts(@RequestParam Long postId, Long userId) {
-        // 校验用户ID是否存在
+    @PostMapping("/toggleLike")
+    public BaseResponse<Boolean> toggleLike(
+            @RequestParam Long postId,
+            @RequestParam Long userId
+    ) {
+        // 校验用户ID
         ThrowUtils.throwIf(userId == null, ErrorCode.USER_NOTFOUND);
-        boolean result = communityPostsService.unlikeCommunityPosts(postId, userId);
-        return ResultUtils.success(result);
+
+        // 调用服务层方法，自动判断当前状态并切换
+        boolean newLikeState = communityPostsService.toggleLike(postId, userId);
+
+        return ResultUtils.success(newLikeState);
     }
 
     /**

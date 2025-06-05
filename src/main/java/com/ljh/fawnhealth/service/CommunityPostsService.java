@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.model.entity.CommunityPosts;
 import com.ljh.fawnhealth.model.vo.communityPosts.CommunityPostsVO;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -29,14 +30,15 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
      */
     CommunityPostsVO getCommunityPostsById(Long postId,Integer isPublic);
 
-    /**
-     * 帖子点赞功能
-     *
-     * @param postId 被点赞的帖子ID
-     * @param userId 执行点赞操作的用户ID
-     * @return 操作结果，true表示点赞成功，false表示失败（如已点赞）
-     */
-    boolean likeCommunityPosts(Long postId, Long userId);
+
+//    /**
+//     * 帖子点赞功能
+//     *
+//     * @param postId 被点赞的帖子ID
+//     * @param userId 执行点赞操作的用户ID
+//     * @return 操作结果，true表示点赞成功，false表示失败（如已点赞）
+//     */
+//    boolean likeCommunityPosts(Long postId, Long userId);
 
     /**
      * 获取热点帖子列表
@@ -44,14 +46,14 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
      */
     List<CommunityPostsVO> getHotPosts(int topN);
 
-    /**
-     * 取消帖子点赞
-     *
-     * @param postId 被取消点赞的帖子ID
-     * @param userId 执行取消点赞操作的用户ID
-     * @return 操作结果，true表示取消成功，false表示失败
-     */
-    boolean unlikeCommunityPosts(Long postId, Long userId);
+//    /**
+//     * 取消帖子点赞
+//     *
+//     * @param postId 被取消点赞的帖子ID
+//     * @param userId 执行取消点赞操作的用户ID
+//     * @return 操作结果，true表示取消成功，false表示失败
+//     */
+//    boolean unlikeCommunityPosts(Long postId, Long userId);
 
     /**
      * 检查用户是否已点赞某个帖子
@@ -97,4 +99,5 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
     CommunityPostsVO getCommunityPostsByIdAdmin(Long postId);
 
 
+    boolean toggleLike(Long postId, Long userId);
 }

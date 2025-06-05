@@ -1,6 +1,7 @@
 package com.ljh.fawnhealth.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.exception.BusinessException;
@@ -120,6 +121,14 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
 
         // 6. 插入评论
         commentsMapper.insert(comment);
+
+        // 原子更新帖子评论数（+1）
+        communityPostsMapper.update(
+                null,
+                new UpdateWrapper<CommunityPosts>()
+                        .setSql("comment_count = comment_count + 1")
+                        .eq("id", dto.getPostId())
+        );
 
         // 7. 清除缓存
         clearCommentCacheByPostId(dto.getPostId());
@@ -254,6 +263,15 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         comment.setUpdateTime(new Date());
         commentsMapper.updateById(comment);
 
+        // 原子更新帖子评论数（-1）
+        communityPostsMapper.update(
+                null,
+                new UpdateWrapper<CommunityPosts>()
+                        .setSql("comment_count = comment_count - 1")
+                        .eq("id", comment.getPostId())
+                        .gt("comment_count", 0) // 防止评论数为负数
+        );
+
         // 清除缓存
         clearCommentCacheByPostId(comment.getPostId());
     }
@@ -295,8 +313,7 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
 
         // 发送消息到 MQ，异步写库
         LikeEventDTO likeEvent = new LikeEventDTO(commentId, userId, newLikeState);
-        messageProducer.sendMessage(
-                MqConstant.FH_EXCHANGE_NAME,
+        messageProducer.sendLikeMessage(
                 MqConstant.COMMENT_LIKE_ROUTING_KEY,
                 likeEvent
         );
