@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.rag;
+package com.ljh.fawnhealth.ai.rag.config;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.model.ChatModel;

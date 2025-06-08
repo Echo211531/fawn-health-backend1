@@ -1,4 +1,5 @@
-package com.ljh.fawnhealth.ai.rag;
+package com.ljh.fawnhealth.ai.rag.factory;
+
 
 import org.springframework.ai.chat.client.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;

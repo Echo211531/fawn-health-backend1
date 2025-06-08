@@ -5,21 +5,26 @@ import com.ljh.fawnhealth.ai.agent.FawnManus;
 import com.ljh.fawnhealth.ai.agent.queue.UserInputQueue;
 import com.ljh.fawnhealth.ai.app.HealthApp;
 import com.ljh.fawnhealth.ai.app.HealthReportApp;
+import com.ljh.fawnhealth.ai.store.MongoChatMemory;
 import com.ljh.fawnhealth.commen.BaseResponse;
+import com.ljh.fawnhealth.config.ResultUtils;
+import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import jakarta.annotation.Resource;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/ai")
@@ -122,4 +127,50 @@ public class AiController {
             throw new RuntimeException(e);
         }
     }
+
+    @Resource
+    private MongoChatMemory chatMemory;
+    /**
+     * 根据 chatId 获取历史聊天记录
+     * 支持参数 lastN 控制获取最近 N 条消息（默认获取全部）
+     */
+    @GetMapping("/history/{chatId}")
+    public BaseResponse<List<Message>> getChatHistory(
+            @PathVariable String chatId,
+            @RequestParam(defaultValue = "-1") int lastN) {
+        int effectiveLastN = lastN <= 0 ? Integer.MAX_VALUE : lastN;
+        List<Message> history = chatMemory.get(chatId, effectiveLastN);
+        return ResultUtils.success(history);
+    }
+
+    /**
+     * 获取所有 chatId 列表（用于展示对话历史页面）
+     */
+    @GetMapping("/conversations")
+    public BaseResponse<List<String>> getAllConversations() {
+        Long currentUserId= BaseContext.getCurrentId();
+        String userId = currentUserId.toString();
+        List<String> conversationIds =  chatMemory.findAllConversationIds(userId);
+        return ResultUtils.success(conversationIds);
+    }
+    /**
+     * 新建对话：生成新的 chatId，并在 MongoDB 中插入一条空记录
+     */
+    @PostMapping("/conversations/add")
+    public BaseResponse<String> createNewConversation() {
+        Long currentUserId= BaseContext.getCurrentId();
+        String conversationId = currentUserId + "_" + UUID.randomUUID().toString();
+        chatMemory.add(conversationId, Collections.emptyList()); // 插入空消息记录
+        return ResultUtils.success(conversationId);
+    }
+
+    /**
+     * 删除指定 chatId 的对话记录
+     */
+    @DeleteMapping("/conversations/{chatId}")
+    public BaseResponse<Boolean> deleteConversation(@PathVariable String chatId) {
+        chatMemory.clear(chatId);
+        return ResultUtils.success(true);
+    }
+
 }

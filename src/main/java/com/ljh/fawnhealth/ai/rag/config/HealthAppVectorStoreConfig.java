@@ -1,5 +1,6 @@
-package com.ljh.fawnhealth.ai.rag;
+package com.ljh.fawnhealth.ai.rag.config;
 
+import com.ljh.fawnhealth.ai.rag.HealthAppDocumentLoader;
 import jakarta.annotation.Resource;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;

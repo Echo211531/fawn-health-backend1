@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -79,4 +80,22 @@ public class MongoChatMemory implements ChatMemory {
         Query query = new Query(Criteria.where("conversationId").is(conversationId));
         mongoTemplate.remove(query, ChatMessages.class);
     }
+    //获取所有conversationId
+    public List<String> findAllConversationIds(String userId) {
+        if (userId == null || userId.isEmpty()) {
+            return Collections.emptyList(); // 或抛出异常
+        }
+        // 构建正则表达式：以 userId + "_" 开头
+        Pattern pattern = Pattern.compile("^" + Pattern.quote(userId) + "_");
+        // 使用 regex 替代 matches
+        Query query = new Query(Criteria.where("conversationId").regex(pattern));
+        return mongoTemplate.findDistinct(
+                query,
+                "conversationId",
+                ChatMessages.class,
+                String.class
+        );
+    }
+
+
 }

@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.rag;
+package com.ljh.fawnhealth.ai.rag.config;
 
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;

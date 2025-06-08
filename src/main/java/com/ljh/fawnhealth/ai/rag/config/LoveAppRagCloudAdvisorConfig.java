@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.rag;
+package com.ljh.fawnhealth.ai.rag.config;
 
 import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
 import com.alibaba.cloud.ai.dashscope.rag.DashScopeDocumentRetriever;
