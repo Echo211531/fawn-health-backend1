@@ -9,13 +9,25 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FawnManus extends ToolCallAgent {
+    private final MongoChatMemory mongoChatMemory;
+    @Autowired
+    public FawnManus(ToolCallback[] allTools, ChatModel dashscopeChatModel,
+                     MongoChatMemory mongoChatMemory) {
+        super(allTools, null);  // chatId 留空，后续设置
+        this.mongoChatMemory = mongoChatMemory;
+        init(dashscopeChatModel);
+    }
+    // 允许运行时设置 chatId（直接设置父类的protected字段）
+    public void setChatId(String chatId) {
+        this.chatId = chatId;
+    }
 
-    public FawnManus(ToolCallback[] allTools, ChatModel dashscopeChatModel) {
-        super(allTools);  
+    private void init(ChatModel dashscopeChatModel) {
         this.setName("fawnManus");
         String SYSTEM_PROMPT = """  
           你是一个全能的人工智能助手，你可以调用各种工具来完成用户给你的任务。
@@ -32,19 +44,20 @@ public class FawnManus extends ToolCallAgent {
           如果要在任何时候停止交互，请使用 'terminate' 工具调用，但是调用之前，确保完成任务的最后一步，不要没有完成任务提前退出
           """;
         this.setNextStepPrompt(NEXT_STEP_PROMPT);
-        this.setMaxSteps(20);  
+        this.setMaxSteps(20);
 
         // 初始化超级智能体客户端
         ChatClient chatClient = ChatClient.builder(dashscopeChatModel)
-            .defaultAdvisors(
-                    new MyLoggerAdvisor(), //自定义日志
-                    // 自定义违禁词 Advisor，可按需开启
-                    new ProhibitedWordAdvisor()
-                    //自定义推理增强，可按需开启
-                    //new ReReadingAdvisor()
-                    )
+                .defaultAdvisors(
+                        new MessageChatMemoryAdvisor(mongoChatMemory), //对话记忆
+                        new MyLoggerAdvisor(), //自定义日志
+                        // 自定义违禁词 Advisor，可按需开启
+                        new ProhibitedWordAdvisor()
+                        //自定义推理增强，可按需开启
+                        //new ReReadingAdvisor()
+                )
 
-            .build();  
-        this.setChatClient(chatClient);  
-    }  
+                .build();
+        this.setChatClient(chatClient);
+    }
 }

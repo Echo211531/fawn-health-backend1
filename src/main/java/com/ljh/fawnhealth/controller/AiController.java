@@ -96,11 +96,14 @@ public class AiController {
     public Flux<String> doChatWithMcp(String message, String chatId) {
         return healthApp.doChatWithMcp(message, chatId);
     }
-
+    @Resource
+    private  MongoChatMemory mongoChatMemory;
     // 流式调用 Manus 超级智能体
     @GetMapping("/manus/chat")
-    public SseEmitter doChatWithManus(String message) {
-        FawnManus fawnManus = new FawnManus(allTools, dashscopeChatModel);
+    public SseEmitter doChatWithManus(String message, String chatId) {
+        FawnManus fawnManus = new FawnManus(allTools, dashscopeChatModel,
+                mongoChatMemory);
+        fawnManus.setChatId(chatId);  // 运行时设置 chatId
         return fawnManus.runStream(message);
     }
 
@@ -128,8 +131,6 @@ public class AiController {
         }
     }
 
-    @Resource
-    private MongoChatMemory chatMemory;
     /**
      * 根据 chatId 获取历史聊天记录
      * 支持参数 lastN 控制获取最近 N 条消息（默认获取全部）
@@ -139,7 +140,7 @@ public class AiController {
             @PathVariable String chatId,
             @RequestParam(defaultValue = "-1") int lastN) {
         int effectiveLastN = lastN <= 0 ? Integer.MAX_VALUE : lastN;
-        List<Message> history = chatMemory.get(chatId, effectiveLastN);
+        List<Message> history = mongoChatMemory.get(chatId, effectiveLastN);
         return ResultUtils.success(history);
     }
 
@@ -150,7 +151,7 @@ public class AiController {
     public BaseResponse<List<String>> getAllConversations() {
         Long currentUserId= BaseContext.getCurrentId();
         String userId = currentUserId.toString();
-        List<String> conversationIds =  chatMemory.findAllConversationIds(userId);
+        List<String> conversationIds =  mongoChatMemory.findAllConversationIds(userId);
         return ResultUtils.success(conversationIds);
     }
     /**
@@ -160,7 +161,7 @@ public class AiController {
     public BaseResponse<String> createNewConversation() {
         Long currentUserId= BaseContext.getCurrentId();
         String conversationId = currentUserId + "_" + UUID.randomUUID().toString();
-        chatMemory.add(conversationId, Collections.emptyList()); // 插入空消息记录
+        mongoChatMemory.add(conversationId, Collections.emptyList()); // 插入空消息记录
         return ResultUtils.success(conversationId);
     }
 
@@ -169,7 +170,7 @@ public class AiController {
      */
     @DeleteMapping("/conversations/{chatId}")
     public BaseResponse<Boolean> deleteConversation(@PathVariable String chatId) {
-        chatMemory.clear(chatId);
+        mongoChatMemory.clear(chatId);
         return ResultUtils.success(true);
     }
 

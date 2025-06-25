@@ -38,12 +38,14 @@ public class ToolCallAgent extends ReActAgent {
     // 工具调用管理者  
     private final ToolCallingManager toolCallingManager;
     // 禁用内置的工具调用机制，自己维护上下文  
-    private final ChatOptions chatOptions;
+    private final ChatOptions chatOptions; // 新增：用于会话 ID
+    protected String chatId;
 
-    public ToolCallAgent(ToolCallback[] availableTools) {
+    public ToolCallAgent(ToolCallback[] availableTools, String chatId) {
         super();  
         this.availableTools = availableTools;  
-        this.toolCallingManager = ToolCallingManager.builder().build();  
+        this.toolCallingManager = ToolCallingManager.builder().build();
+        this.chatId = chatId;
         // 禁用 Spring AI 内置的工具调用机制，自己维护选项和消息上下文  
         this.chatOptions = DashScopeChatOptions.builder()
                 .withProxyToolCalls(true)  
@@ -67,11 +69,9 @@ public class ToolCallAgent extends ReActAgent {
         Prompt prompt = new Prompt(messageList, chatOptions);
         try {
             //3. 调用 LLM 模型进行思考
-            //对话记忆的唯一标识
-            String conversantId = UUID.randomUUID().toString();
             // 传入系统提示词、可用工具列表（tools）等信息
             ChatResponse chatResponse = getChatClient().prompt(prompt)
-                    .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, conversantId)
+                    .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
                             .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
                     .system(getSystemPrompt())
                     .tools(availableTools)
@@ -142,5 +142,4 @@ public class ToolCallAgent extends ReActAgent {
         log.info(results);
         return results;
     }
-
 }
