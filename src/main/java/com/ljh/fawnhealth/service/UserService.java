@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 
+import java.math.BigDecimal;
+
 
 public interface UserService extends IService<User> {
 
@@ -14,4 +16,13 @@ public interface UserService extends IService<User> {
      * @return
      */
     UserLoginVO findUserByEmail(String email, String clientIp);
+
+    /**
+     * 更新用户体重和目标体重信息
+     * @param userId 用户ID
+     * @param weight 体重(kg)
+     * @param targetWeight 目标体重(kg)
+     * @return 更新是否成功
+     */
+    void updateWeightInfo(Long userId, BigDecimal weight, BigDecimal targetWeight, Integer periodDays);
 }

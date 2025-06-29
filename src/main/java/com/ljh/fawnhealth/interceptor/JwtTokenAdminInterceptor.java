@@ -52,6 +52,7 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
             log.info("当前用户id：{}", userId);
             //使用ThreadLocal技术，在common中的context中有BaseContext工具类
             BaseContext.setCurrentId(userId);
+            log.info("存储的用户id：{}",BaseContext.getCurrentId());
             //3、通过，放行
             return true;
         }catch (Exception ex) {

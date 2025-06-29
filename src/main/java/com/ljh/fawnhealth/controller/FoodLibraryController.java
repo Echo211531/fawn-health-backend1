@@ -146,6 +146,20 @@ public class FoodLibraryController {
         return ResultUtils.success("删除成功");
     }
 
+    /**
+     * 获取常见食物信息列表（不分页）
+     *
+     * @param categoryId 分类ID，可选
+     * @return 常见食物信息列表
+     */
+    @GetMapping("/commonFoods")
+    public BaseResponse<List<FoodLibraryVO>> getCommonFoods(
+            @RequestParam(required = false) Long categoryId) {
+        log.info("获取常见食物列表，分类ID: {}", categoryId);
+        List<FoodLibraryVO> commonFoods = foodLibraryService.getCommonFoods(categoryId);
+        return ResultUtils.success(commonFoods);
+    }
+
 
 
 //

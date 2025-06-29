@@ -86,6 +86,11 @@ public class User implements Serializable {
     private String role;
 
     /**
+     * 每日摄入的热量
+     */
+    private BigDecimal dailyCalories;
+
+    /**
      * 是否VIP:0否,1是
      */
     private Integer isVip;

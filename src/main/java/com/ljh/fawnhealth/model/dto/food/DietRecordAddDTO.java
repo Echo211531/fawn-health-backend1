@@ -22,16 +22,6 @@ public class DietRecordAddDTO {
     private Integer mealType;
 
     /**
-     * 记录日期（仅日期部分）
-     */
-    private Date recordDate;
-
-    /**
-     * 记录时间（精确到时间）
-     */
-    private Date recordTime;
-
-    /**
      * 备注信息
      */
     private String note;
