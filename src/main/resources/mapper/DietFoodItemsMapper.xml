@@ -11,6 +11,14 @@
           AND is_delete = 0
     </select>
 
+    <select id="selectByRecordIds" resultType="com.ljh.fawnhealth.model.entity.DietFoodItems">
+        SELECT * FROM diet_food_items
+        WHERE diet_record_id IN
+        <foreach collection="recordIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <delete id="deleteByRecordId" parameterType="java.lang.Long">
         DELETE FROM diet_food_items WHERE record_id = #{recordId}
     </delete>

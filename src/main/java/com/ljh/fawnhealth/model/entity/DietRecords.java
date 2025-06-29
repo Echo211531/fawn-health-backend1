@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -46,6 +47,11 @@ public class DietRecords implements Serializable {
      * 备注信息
      */
     private String note;
+
+    /**
+     * 热量
+     */
+    private BigDecimal totalCalories;
 
     /**
      * 创建时间

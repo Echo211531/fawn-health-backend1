@@ -119,4 +119,17 @@ public class  FoodDiaryController {
         return ResultUtils.success(success);
     }
 
+    /**
+     * 查询用户当天摄入的总热量
+     *
+     * @param userId 用户ID
+     * @return 返回用户当天摄入的总热量
+     */
+    @GetMapping("/getTodayTotalCalories")
+    public BaseResponse<BigDecimal> getTodayTotalCalories(@RequestParam Long userId) {
+        log.info("查询用户 {} 当天摄入的总热量", userId);
+        BigDecimal totalCalories = dietRecordsService.getTodayTotalCalories(userId);
+        return ResultUtils.success(totalCalories);
+    }
+
 }

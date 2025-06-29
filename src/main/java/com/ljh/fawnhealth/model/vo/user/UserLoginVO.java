@@ -77,6 +77,11 @@ public class UserLoginVO {
     private Date vipExpireTime;
 
     /**
+     * 每日摄入的热量
+     */
+    private BigDecimal dailyCalories;
+
+    /**
      * VIP等级
      */
     private Integer vipLevel;

@@ -12,6 +12,7 @@ CREATE TABLE `user` (
                         `weight` decimal(5,2) DEFAULT NULL COMMENT '体重(kg)',
                         `target_weight` decimal(5,2) DEFAULT NULL COMMENT '目标体重(kg)',
                         `bmi` decimal(5,2) DEFAULT NULL COMMENT 'BMI指数',
+                        `daily_calories` decimal(10,2) DEFAULT NULL COMMENT '每日建议摄入热量(大卡)',
                          -- VIP相关字段
                         `is_vip` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否VIP:0否,1是',
                         `vip_expire_time` datetime DEFAULT NULL COMMENT 'VIP过期时间',
@@ -211,6 +212,7 @@ CREATE TABLE `diet_records` (
                                 `meal_type` TINYINT NOT NULL COMMENT '餐次类型（1早餐，2午餐，3晚餐，4加餐）',
                                 `record_date` DATE NOT NULL COMMENT '记录日期（仅日期部分）',
                                 `record_time` TIME DEFAULT NULL COMMENT '记录时间（具体时刻）',
+                                `total_calories` DECIMAL(10,2) DEFAULT 0 COMMENT '总热量(kcal)', -- 新增字段
                                 `note` VARCHAR(255) DEFAULT NULL COMMENT '备注信息',
                                 `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                                 `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -240,36 +242,6 @@ CREATE TABLE `diet_food_items` (
                                    KEY `idx_record_id` (`record_id`),
                                    CONSTRAINT `fk_record_id` FOREIGN KEY (`record_id`) REFERENCES `diet_records`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='饮食记录-食物项表';
-#
-# CREATE TABLE `vip_orders` (
-#                               `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单ID',
-#                               `order_no` varchar(50) NOT NULL COMMENT '订单编号',
-#                               `user_id` bigint NOT NULL COMMENT '用户ID',
-#                               `vip_type` tinyint NOT NULL COMMENT '会员类型:1月卡,2季卡,3年卡',
-#                               `vip_plan_id` bigint DEFAULT NULL COMMENT '会员方案ID（预留字段）',
-#                               `amount` decimal(10,2) NOT NULL COMMENT '订单金额',
-#                               `discount_amount` decimal(10,2) DEFAULT '0.00' COMMENT '优惠金额',
-#                               `payment_method` tinyint DEFAULT NULL COMMENT '支付方式:1微信,2支付宝,3苹果支付',
-#                               `trade_no` varchar(100) DEFAULT NULL COMMENT '第三方支付订单号',
-#                               `payment_time` datetime DEFAULT NULL COMMENT '支付时间',
-#                               `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态:0未支付,1已支付,2已取消,3已退款',
-#                               `start_time` datetime DEFAULT NULL COMMENT '会员开始时间',
-#                               `end_time` datetime DEFAULT NULL COMMENT '会员结束时间',
-#                               `coupon_id` bigint DEFAULT NULL COMMENT '使用的优惠券ID',
-#                               `refund_amount` decimal(10,2) DEFAULT NULL COMMENT '退款金额',
-#                               `refund_time` datetime DEFAULT NULL COMMENT '退款时间',
-#                               `source` tinyint DEFAULT NULL COMMENT '订单来源:1App,2小程序,3H5,4后台',
-#                               `is_renewal` tinyint DEFAULT 0 COMMENT '是否为自动续费订单: 0否, 1是',
-#                               `remark` varchar(255) DEFAULT NULL COMMENT '订单备注',
-#                               `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-#                               `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-#                               `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
-#                               PRIMARY KEY (`id`),
-#                               UNIQUE KEY `idx_order_no` (`order_no`),
-#                               KEY `idx_user_id` (`user_id`),
-#                               KEY `idx_create_time` (`create_time`),
-#                               KEY `idx_status` (`status`)
-# ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员订单表';
 
 CREATE TABLE `vip_orders` (
                               `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单ID',
@@ -302,23 +274,6 @@ CREATE TABLE `vip_orders` (
                               KEY `idx_status` (`status`),
                               KEY `idx_final_amount` (`final_amount`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员订单表';
-
-# CREATE TABLE `vip_benefits` (
-#                                 `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-#                                 `vip_type` tinyint NOT NULL COMMENT '会员类型: 1月卡, 2季卡, 3年卡（或绑定vip_orders的vip_type）',
-#                                 `benefit_code` varchar(50) NOT NULL COMMENT '权益编码，例如：DAILY_REPORT、NO_ADS、UNLOCK_RECIPES',
-#                                 `benefit_name` varchar(100) NOT NULL COMMENT '权益名称',
-#                                 `description` varchar(255) DEFAULT NULL COMMENT '权益描述',
-#                                 `value` varchar(100) DEFAULT NULL COMMENT '权益值（如次数、额度、期限等）',
-#                                 `sort_order` int DEFAULT 0 COMMENT '展示顺序',
-#                                 `status` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用: 0停用, 1启用',
-#                                 `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-#                                 `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-#                                 `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除',
-#                                 PRIMARY KEY (`id`),
-#                                 KEY `idx_vip_type` (`vip_type`),
-#                                 KEY `idx_benefit_code` (`benefit_code`)
-# ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='VIP权益表';
 
 CREATE TABLE `vip_benefits` (
                                 `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -375,3 +330,4 @@ CREATE TABLE `comment_likes` (
                                  UNIQUE KEY `uk_comment_user` (`comment_id`, `user_id`),
                                  KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论点赞表';
+

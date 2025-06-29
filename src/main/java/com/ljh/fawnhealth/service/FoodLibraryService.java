@@ -47,4 +47,12 @@ public interface FoodLibraryService extends IService<FoodLibrary> {
      * @return FoodLibraryVO
      */
     FoodLibraryVO getFoodDetailById(Long foodId);
+
+    /**
+     * 获取常见食物信息列表（不分页）
+     *
+     * @param categoryId 分类ID，可选
+     * @return 常见食物信息列表
+     */
+    List<FoodLibraryVO> getCommonFoods(Long categoryId);
 }

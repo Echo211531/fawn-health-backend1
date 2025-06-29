@@ -66,4 +66,12 @@ public interface DietRecordsService extends IService<DietRecords> {
      * @return 修改是否成功
      */
     boolean updateDietRecord(DietRecordUpdateDTO updateDTO);
+
+    /**
+     * 查询用户当天摄入的总热量
+     *
+     * @param userId 用户ID
+     * @return 返回用户当天摄入的总热量
+     */
+    BigDecimal getTodayTotalCalories(Long userId);
 }

@@ -2,8 +2,10 @@ package com.ljh.fawnhealth.controller;
 
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
+import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
+import com.ljh.fawnhealth.model.dto.user.WeightDTO;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 import com.ljh.fawnhealth.service.EmailService;
 import com.ljh.fawnhealth.service.UserService;
@@ -13,6 +15,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -79,7 +83,7 @@ public class UserController {
         String clientIp = getClientIp(request);
         // 校验通过，调用登录逻辑
         UserLoginVO userLoginVO = userService.findUserByEmail(userLoginDTO.getEmail(),clientIp);
-
+        log.info("userLoginVO:{}", userLoginVO);
         return ResultUtils.success(userLoginVO);
     }
 
@@ -93,6 +97,24 @@ public class UserController {
         return ResultUtils.success("退出成功");
     }
 
+    /**
+     * 设置用户体重和目标体重
+     *
+     * @param request      HTTP请求
+     * @param weightDTO    包含体重、目标体重和周期的DTO
+     * @return 更新结果
+     */
+    @PostMapping("/weight")
+    public BaseResponse<String> setWeightAndTargetWeight(HttpServletRequest request, @RequestBody WeightDTO weightDTO) {
+        Long userId = weightDTO.getUserId();
+        if (userId == null) {
+            return ResultUtils.error(ErrorCode.USER_NOTFOUND);
+        }
+
+        // 调用服务层更新用户体重信息（传递周期参数）
+        userService.updateWeightInfo(userId, weightDTO.getWeight(), weightDTO.getTargetWeight(), weightDTO.getPeriodDays());
+        return ResultUtils.success("体重信息更新成功");
+    }
 
     /**
      * 获取用户登录的ip地址

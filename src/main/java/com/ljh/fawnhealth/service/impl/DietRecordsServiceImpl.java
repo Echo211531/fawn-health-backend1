@@ -16,25 +16,24 @@ import com.ljh.fawnhealth.model.vo.food.DietRecordDetailVO;
 import com.ljh.fawnhealth.model.vo.food.DietRecordSimpleVO;
 import com.ljh.fawnhealth.service.DietRecordsService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * 针对表【diet_records(饮食记录主表)】的数据库操作Service实现类
  * 实现饮食记录的增删查等业务逻辑
- *
- * @author 27105
- * @createDate 2025-05-25 18:10:41
  */
+@Slf4j
 @Service
 public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietRecords>
         implements DietRecordsService {
@@ -61,8 +60,8 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         DietRecords record = new DietRecords();
         record.setUserId(dto.getUserId());
         record.setMealType(dto.getMealType());
-        record.setRecordDate(dto.getRecordDate());
-        record.setRecordTime(dto.getRecordTime());
+        record.setRecordDate(new Date());
+        record.setRecordTime(new Date());
         record.setNote(dto.getNote());
         record.setCreateTime(new Date());
         record.setUpdateTime(new Date());
@@ -111,12 +110,21 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
 
                     // 累加总热量
                     totalCalories = totalCalories.add(calories);
+
                 }
             }
 
             for (DietFoodItems item : items) {
                 dietFoodItemsMapper.insert(item);
             }
+        }
+
+        // 新增：更新主记录的总热量
+        if (recordId != null && totalCalories.compareTo(BigDecimal.ZERO) > 0) {
+            DietRecords updateRecord = new DietRecords();
+            updateRecord.setId(recordId);
+            updateRecord.setTotalCalories(totalCalories);
+            dietRecordsMapper.updateById(updateRecord);
         }
 
         return totalCalories;
@@ -319,6 +327,31 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         }
 
         return true;
+    }
+
+    /**
+     * 获取用户当天摄入的总热量（直接从diet_records表获取）
+     *
+     * @param userId 用户ID
+     * @return 总热量，如果没有记录则返回0
+     */
+    public BigDecimal getTodayTotalCalories(Long userId) {
+        LocalDate today = LocalDate.now();
+        Date todayDate = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        // 查询当天的所有饮食记录
+        List<DietRecords> records = dietRecordsMapper.selectByUserIdAndDate(userId, todayDate);
+
+        // 添加日志验证查询结果
+        log.info("用户 {} 当天饮食记录数量: {}", userId, records.size());
+        records.forEach(record -> {
+            log.info("记录ID: {}, 总热量: {}", record.getId(), record.getTotalCalories());
+        });
+
+        return records.stream()
+                .map(DietRecords::getTotalCalories)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
 

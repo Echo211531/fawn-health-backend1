@@ -1,6 +1,8 @@
 package com.ljh.fawnhealth.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
@@ -15,8 +17,10 @@ import com.ljh.fawnhealth.model.vo.food.FoodLibraryVO;
 import com.ljh.fawnhealth.service.FoodLibraryService;
 import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import jakarta.annotation.Resource;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 食物相关服务实现类
@@ -153,6 +157,38 @@ public class FoodLibraryServiceImpl extends ServiceImpl<FoodLibraryMapper, FoodL
         FoodLibrary foodLibrary = foodLibraryMapper.selectById(foodId);
         ThrowUtils.throwIf(foodLibrary == null, ErrorCode.FOOD_NOT_FOUND);
         return BeanCopyUtils.copy(foodLibrary, FoodLibraryVO.class);
+    }
+
+    /**
+     * 获取常见食物信息列表（不分页）
+     *
+     * @param categoryId 分类ID，可选
+     * @return 常见食物信息列表
+     */
+    @Override
+    public List<FoodLibraryVO> getCommonFoods(Long categoryId) {
+        // 构建查询条件
+        QueryWrapper<FoodLibrary> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("is_common", 1); // 只查询常见食物
+        queryWrapper.eq("is_delete", 0); // 只查询未删除的食物
+
+        // 如果指定了分类ID，则添加分类条件
+        if (categoryId != null) {
+            queryWrapper.eq("category_id", categoryId);
+        }
+
+        // 限制返回数量为20条
+        Page<FoodLibrary> page = new Page<>(1, 20); // 第一页，每页20条
+        IPage<FoodLibrary> foodPage = foodLibraryMapper.selectPage(page, queryWrapper);
+
+        // 转换为VO对象列表
+        return foodPage.getRecords().stream()
+                .map(foodLibrary -> {
+                    FoodLibraryVO vo = new FoodLibraryVO();
+                    BeanUtils.copyProperties(foodLibrary, vo);
+                    return vo;
+                })
+                .collect(Collectors.toList());
     }
 
 }

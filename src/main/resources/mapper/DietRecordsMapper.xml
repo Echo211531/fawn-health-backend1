@@ -11,14 +11,23 @@
             <result property="recordDate" column="record_date" jdbcType="DATE"/>
             <result property="recordTime" column="record_time" jdbcType="TIME"/>
             <result property="note" column="note" jdbcType="VARCHAR"/>
+            <result property="totalCalories" column="total_calories" jdbcType="DECIMAL"/>
             <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
             <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
     </resultMap>
 
+    <select id="selectByUserIdAndDate" resultType="com.ljh.fawnhealth.model.entity.DietRecords">
+        SELECT * FROM diet_records
+        WHERE user_id = #{userId}
+          AND record_date = #{recordDate}
+          AND is_delete = 0
+    </select>
+
     <sql id="Base_Column_List">
-        id,user_id,meal_type,
+        id,user_id,meal_type,totalCalories
         record_date,record_time,note,
         create_time,update_time,is_delete
     </sql>
+
 </mapper>

@@ -18,6 +18,7 @@
             <result property="weight" column="weight" jdbcType="DECIMAL"/>
             <result property="targetWeight" column="target_weight" jdbcType="DECIMAL"/>
             <result property="bmi" column="bmi" jdbcType="DECIMAL"/>
+            <result property="dailyCalories" column="daily_calories" jdbcType="DECIMAL"/>
             <result property="isVip" column="is_vip" jdbcType="TINYINT"/>
             <result property="vipExpireTime" column="vip_expire_time" jdbcType="TIMESTAMP"/>
             <result property="vipLevel" column="vip_level" jdbcType="TINYINT"/>
@@ -31,7 +32,7 @@
     <sql id="Base_Column_List">
         id,email,email_verified,
         password,avatar,nickname,
-        gender,birthday,height,role,
+        gender,birthday,height,role,dailyCalories
         weight,target_weight,bmi,
         is_vip,vip_expire_time,vip_level,
         status,last_login_time,last_login_ip,

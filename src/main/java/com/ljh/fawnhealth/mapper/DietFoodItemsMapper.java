@@ -27,4 +27,5 @@ public interface DietFoodItemsMapper extends BaseMapper<DietFoodItems> {
 
     int batchInsert(@Param("list") List<DietFoodItems> list);
 
+    List<DietFoodItems> selectByRecordIds(List<Long> recordIds);
 }

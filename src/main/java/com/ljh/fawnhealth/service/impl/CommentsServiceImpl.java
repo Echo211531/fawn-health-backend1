@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.handler.PromotionMqHandler;
@@ -85,7 +86,9 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         // 2. 构建评论实体
         Comments comment = new Comments();
         comment.setPostId(dto.getPostId());
-        comment.setUserId(dto.getUserId());
+        Long userId = BaseContext.getCurrentId();
+        //comment.setUserId(dto.getUserId());
+        comment.setUserId(userId);
         comment.setContent(dto.getContent());
         comment.setIsDelete(0);
         comment.setCreateTime(new Date());
