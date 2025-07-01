@@ -36,7 +36,7 @@ public abstract class BaseAgent {
 
     // 执行步骤控制
     private int currentStep = 0;       // 当前执行步数
-    private int maxSteps = 10;         // 最大执行步数
+    private int maxSteps = 6;         // 最大执行步数
 
     // LLM 大模型客户端
     private ChatClient chatClient;

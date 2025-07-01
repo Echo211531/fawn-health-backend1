@@ -5,6 +5,7 @@ import jakarta.annotation.Resource;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
+
 //AI大模型向用户提问的工具
 @Component
 public class QueryUserTool {

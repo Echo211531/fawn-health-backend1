@@ -26,6 +26,8 @@ public class ToolRegistration {
     QueryUserTool queryUserTool;
     @Resource
     SaveAsMarkdownTool saveAsMarkdownTool;
+    @Resource
+    DietTools dietTools;
     /**
      * 注册所有AI工具
      */
@@ -33,12 +35,13 @@ public class ToolRegistration {
     public ToolCallback[] allTools() {
         // 实例化所有工具
         return ToolCallbacks.from(
+                dietTools,
                 zhipuWebSearchTool,
-                queryUserTool,
+               // queryUserTool,
                 saveAsMarkdownTool,
                 new WebScrapingTool(),
                 fileOperationTool,
-                databaseOperationTool,
+               // databaseOperationTool,
                 new ResourceDownloadTool(),
                 new PDFGenerationTool(),
                 new DateTimeTool(),
