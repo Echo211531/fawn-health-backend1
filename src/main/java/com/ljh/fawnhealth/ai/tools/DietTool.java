@@ -4,9 +4,12 @@ import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.model.dto.food.DietFoodItemDTO;
 import com.ljh.fawnhealth.model.dto.food.DietRecordAddDTO;
 import com.ljh.fawnhealth.model.entity.FoodLibrary;
+import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.service.DietRecordsService;
 import com.ljh.fawnhealth.service.FoodLibraryService;
+import com.ljh.fawnhealth.service.UserService;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -17,12 +20,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class DietTools {
+public class DietTool {
 
     @Resource
     private DietRecordsService dietRecordsService;
     @Resource
     private FoodLibraryService foodLibraryService;
+    @Resource
+    private UserService userService;
 
     /**
      * 添加饮食记录工具方法
@@ -30,15 +35,12 @@ public class DietTools {
      * 2. 构建饮食记录DTO并保存
      * 3. 使用事务保证数据一致性
      */
-    @Tool(description = "给用户添加饮食记录，用户必须指定餐次类型（早餐/午餐/晚餐/加餐）和食物列表。" +
-                    "每项食物需要提供名称、食用量、单位（g或份）和可选备注。" +
-                    "如果食物不存在于数据库，则无法添加并返回错误信息"
-    )
-    @Transactional(rollbackFor = Exception.class)
+    //@Transactional(rollbackFor = Exception.class)
+    @Tool( description = "添加饮食记录到数据库，用户必须指定餐次类型（早餐/午餐/晚餐/加餐）和食物列表。")
     public String addDietRecord(
             @ToolParam(description = "餐次类型，必须是：早餐、午餐、晚餐或加餐", required = true) String mealType,
-            @ToolParam(description = "食物项列表，格式：'食物名称1:食用量1:单位1:备注1;食物名称2:食用量2:单位2:备注2'", required = true) String foodItems
-    ) {
+            @ToolParam(description = "食物项列表(提供名称、食用量、单位（g或份）和可选备注)，格式：'食物名称1:食用量1:单位1:备注1;食物名称2:食用量2:单位2:备注2'", required = true) String foodItems
+    ,HttpServletRequest request) {
 
         // 验证并转换餐次类型
         Integer mealTypeCode = validateMealType(mealType);
@@ -52,6 +54,10 @@ public class DietTools {
             return "食物项格式错误或存在无效食物！请按格式提供：'食物名称:食用量:单位:备注'，多组用分号分隔。例如：'牛奶:250:g:全脂;鸡蛋:1:份:水煮蛋'";
         }
         Long userId = BaseContext.getCurrentId();
+        if( userId == null){
+            userId=userService.getLoginUser(request).getId();
+        }
+
         // 构建并保存饮食记录
         DietRecordAddDTO recordDTO = new DietRecordAddDTO();
         recordDTO.setUserId(userId);
@@ -68,6 +74,7 @@ public class DietTools {
             return "饮食记录保存失败: " + e.getMessage();
         }
     }
+
 
     /**
      * 验证并转换餐次类型

@@ -67,6 +67,7 @@ public class HealthApp {
                 .content();
     }
 
+
     // 注入 QueryRewriter 和 VectorStore
     @Autowired
     private QueryRewriter queryRewriter;
@@ -74,6 +75,7 @@ public class HealthApp {
     private VectorStore healthAppVectorStore;
     @Autowired
     private Advisor healthAppRagCloudAdvisor;
+
     @jakarta.annotation.Resource
     private VectorStore pgVectorVectorStore;
 

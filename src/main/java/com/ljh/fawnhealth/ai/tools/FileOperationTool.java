@@ -34,7 +34,7 @@ public class FileOperationTool {
      * @return 文件内容字符串
      */
     @Tool(description = "从OSS中读取文件内容")
-    public String readFile(@ToolParam(description = "要读取的文件名") String fileName) {
+    public String readFileFromOSS(@ToolParam(description = "要读取的文件名") String fileName) {
         try {
             OSS ossClient = new OSSClientBuilder().build(aliOssUtil.getEndpoint(), aliOssUtil.getAccessKeyId(), aliOssUtil.getAccessKeySecret());
             OSSObject ossObject = ossClient.getObject(aliOssUtil.getBucketName(), getObjectKey(fileName));
@@ -59,7 +59,7 @@ public class FileOperationTool {
      * @return 操作结果
      */
     @Tool(description = "写入内容到OSS文件")
-    public String writeFile(
+    public String writeFileToOSS(
             @ToolParam(description = "要写入的文件名") String fileName,
             @ToolParam(description = "要写入的内容") String content
     ) {

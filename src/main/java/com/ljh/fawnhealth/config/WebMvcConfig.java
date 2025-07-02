@@ -17,7 +17,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowCredentials(true)
-                .allowedOriginPatterns("http://localhost:5173") // 明确指定允许的来源
+                .allowedOriginPatterns("*") // 明确指定允许的来源
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .exposedHeaders("*");
@@ -38,5 +38,4 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/favicon.ico"
                 );
     }
-
 }

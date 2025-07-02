@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.config.JwtProperties;
 import com.ljh.fawnhealth.constant.JwtClaimsConstant;
+import com.ljh.fawnhealth.context.BaseContext;
+import com.ljh.fawnhealth.exception.BusinessException;
+import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.UserMapper;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.enums.user.UserRole;
@@ -11,6 +14,7 @@ import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 import com.ljh.fawnhealth.service.UserService;
 import com.ljh.fawnhealth.utils.JwtUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -19,6 +23,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+
+import static com.ljh.fawnhealth.constant.UserConstant.USER_LOGIN_STATE;
 
 @Slf4j
 @Service
@@ -50,7 +56,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public UserLoginVO findUserByEmail(String email, String loginIp) {
+    public UserLoginVO findUserByEmail(String email, String loginIp,HttpServletRequest request) {
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(User::getEmail, email);
         User user = userMapper.selectOne(queryWrapper);
@@ -79,7 +85,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         } else {
             userMapper.updateById(user);
         }
-
         // 生成 Token
         Map<String, Object> claims = new HashMap<>();
         claims.put(JwtClaimsConstant.USER_ID, user.getId());
@@ -88,6 +93,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 jwtProperties.getUserTtl(),
                 claims
         );
+        // 记录用户的登录态，存入用户信息
+        request.getSession().setAttribute(USER_LOGIN_STATE, user);
 
         // 构建返回对象
         UserLoginVO vo = new UserLoginVO();
@@ -242,6 +249,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         } else {
             return tdee.subtract(dailyExtraCalories.abs());
         }
+    }
+
+    /**
+     * 获取当前用户
+     * @return
+     */
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        // 先判断是否已登录
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User currentUser = (User) userObj;
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        long userId = currentUser.getId();
+        currentUser = this.getById(userId);
+        if (currentUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+
+        BaseContext.setCurrentId(userId);
+
+        return currentUser;
     }
 
 }

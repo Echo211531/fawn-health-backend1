@@ -6,6 +6,7 @@ import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
 import com.ljh.fawnhealth.model.dto.user.WeightDTO;
+import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 import com.ljh.fawnhealth.service.EmailService;
 import com.ljh.fawnhealth.service.UserService;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.concurrent.TimeUnit;
+
+import static com.ljh.fawnhealth.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
  * 用户模块
@@ -82,7 +85,7 @@ public class UserController {
         // 获取客户端 IP 地址
         String clientIp = getClientIp(request);
         // 校验通过，调用登录逻辑
-        UserLoginVO userLoginVO = userService.findUserByEmail(userLoginDTO.getEmail(),clientIp);
+        UserLoginVO userLoginVO = userService.findUserByEmail(userLoginDTO.getEmail(),clientIp,request);
         log.info("userLoginVO:{}", userLoginVO);
         return ResultUtils.success(userLoginVO);
     }
@@ -139,5 +142,13 @@ public class UserController {
         }
         return ip;
     }
+
+    //获取当前用户信息
+    @GetMapping("/get/login")
+    public BaseResponse<User> getLoginUser(HttpServletRequest request) {
+        User user = userService.getLoginUser(request);
+        return ResultUtils.success(user);
+    }
+
 
 }

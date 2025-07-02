@@ -2,7 +2,7 @@ package com.ljh.fawnhealth.context;
 
 public class BaseContext {
 
-    public static ThreadLocal<Long> threadLocal = new ThreadLocal<>();
+    public static final ThreadLocal<Long> threadLocal = new ThreadLocal<>();
 
     /**
      * 设置用户id到threadLocal内存空间中
