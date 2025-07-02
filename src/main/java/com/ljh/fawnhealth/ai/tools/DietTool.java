@@ -10,6 +10,7 @@ import com.ljh.fawnhealth.service.FoodLibraryService;
 import com.ljh.fawnhealth.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Component
 public class DietTool {
 
@@ -40,7 +42,7 @@ public class DietTool {
     public String addDietRecord(
             @ToolParam(description = "餐次类型，必须是：早餐、午餐、晚餐或加餐", required = true) String mealType,
             @ToolParam(description = "食物项列表(提供名称、食用量、单位（g或份）和可选备注)，格式：'食物名称1:食用量1:单位1:备注1;食物名称2:食用量2:单位2:备注2'", required = true) String foodItems
-    ,HttpServletRequest request) {
+     ) {
 
         // 验证并转换餐次类型
         Integer mealTypeCode = validateMealType(mealType);
@@ -54,8 +56,11 @@ public class DietTool {
             return "食物项格式错误或存在无效食物！请按格式提供：'食物名称:食用量:单位:备注'，多组用分号分隔。例如：'牛奶:250:g:全脂;鸡蛋:1:份:水煮蛋'";
         }
         Long userId = BaseContext.getCurrentId();
-        if( userId == null){
-            userId=userService.getLoginUser(request).getId();
+        log.info("业务处理中获取的用户ID：{}", BaseContext.getCurrentId());
+
+        if (userId == null) {
+            log.error("用户ID为null，可能导致数据库插入失败");
+            return "操作失败：用户会话已过期，请重新登录";
         }
 
         // 构建并保存饮食记录

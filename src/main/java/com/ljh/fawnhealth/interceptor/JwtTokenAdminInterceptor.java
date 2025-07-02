@@ -25,50 +25,62 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
 
     /**
      * 校验jwt
-     *
-     * @param request
-     * @param response
-     * @param handler
-     * @return
-     * @throws Exception
      */
+    @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.info("JwtTokenAdminInterceptor 执行了！请求路径为：{}", request.getRequestURI());
 
-        //判断当前拦截到的是Controller的方法还是其他资源
+        // 初始化当前线程的用户ID，防止残留数据
+        BaseContext.removeCurrentId();
+
+        // 判断当前拦截到的是Controller的方法还是其他资源
         if (!(handler instanceof HandlerMethod)) {
-            //当前拦截到的不是动态方法，直接放行
+            log.info("非Controller方法，直接放行");
             return true;
         }
 
-        //1、从请求头中获取令牌
+        // 1、从请求头中获取令牌
         String token = request.getHeader(jwtProperties.getUserTokenName());
+        log.info("获取到的令牌: {}", token != null ? "***" : "null");
 
-        //2、校验令牌
+        // 2、校验令牌
         try {
-            log.info("jwt校验:{}", token);
+            if (token == null || token.trim().isEmpty()) {
+                throw new IllegalArgumentException("缺少JWT令牌");
+            }
+
+            log.info("开始解析JWT");
             Claims claims = JwtUtil.parseJWT(jwtProperties.getUserSecretKey(), token);
             Long userId = Long.valueOf(claims.get(JwtClaimsConstant.USER_ID).toString());
-            log.info("当前用户id：{}", userId);
-            //使用ThreadLocal技术，在common中的context中有BaseContext工具类
+            log.info("当前用户ID：{}", userId);
+
+            // 使用ThreadLocal存储用户ID
             BaseContext.setCurrentId(userId);
-            log.info("存储的用户id：{}",BaseContext.getCurrentId());
-            //3、通过，放行
+            log.info("已存储用户ID到ThreadLocal");
+
             return true;
-        }catch (Exception ex) {
-            log.error("JWT 校验失败：{}", ex.getMessage());
+        } catch (Exception ex) {
+            log.error("JWT 校验失败：{}", ex.getMessage(), ex);
+
+            // 确保清除可能存在的ThreadLocal数据
+            BaseContext.removeCurrentId();
+
+            // 返回未授权响应
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setCharacterEncoding("UTF-8");
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"code\":40100,\"data\":\"null\",\"msg\":\"未登录或Token已失效\"}");
 
-
             return false;
         }
     }
+
+    /**
+     * 请求完成后清除ThreadLocal中的用户信息
+     */
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        // 请求完成后清除ThreadLocal中的用户信息
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        log.info("请求处理完成，清除ThreadLocal中的用户ID");
         BaseContext.removeCurrentId();
     }
 }

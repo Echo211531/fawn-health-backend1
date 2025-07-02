@@ -1,8 +1,10 @@
 package com.ljh.fawnhealth.context;
 
+import com.alibaba.ttl.TransmittableThreadLocal;
+
 public class BaseContext {
 
-    public static final ThreadLocal<Long> threadLocal = new ThreadLocal<>();
+    public static final ThreadLocal<Long> threadLocal = new TransmittableThreadLocal<>();
 
     /**
      * 设置用户id到threadLocal内存空间中
