@@ -1,6 +1,7 @@
 package com.ljh.fawnhealth.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,5 +27,14 @@ public interface UserService extends IService<User> {
      * @return 更新是否成功
      */
     void updateWeightInfo(Long userId, BigDecimal weight, BigDecimal targetWeight, Integer periodDays);
+
     User getLoginUser(HttpServletRequest request);
+
+    /**
+     * 更新用户信息
+     * @param userId 用户ID
+     * @param userUpdateDTO 包含要更新的用户信息
+     * @return 更新后的用户信息
+     */
+    User updateUserInfo(Long userId, UserUpdateDTO userUpdateDTO);
 }

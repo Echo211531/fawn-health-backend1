@@ -3,8 +3,10 @@ package com.ljh.fawnhealth.controller;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.context.BaseContext;
+import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
+import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.WeightDTO;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
@@ -150,5 +152,36 @@ public class UserController {
         return ResultUtils.success(user);
     }
 
+    /**
+     * 修改用户信息接口
+     * 支持部分字段更新（昵称、头像、生日、身高、体重、目标体重）
+     * @param userUpdateDTO
+     * @param request
+     * @return
+     */
+    @PostMapping("/update")
+    public BaseResponse<User> updateUserInfo(
+            @RequestBody UserUpdateDTO userUpdateDTO,
+            HttpServletRequest request) {
+        // 1. 优先从上下文获取当前登录用户ID
+        Long userId = BaseContext.getCurrentId();
+
+        // 2. 若上下文无ID，尝试从DTO中获取
+        if (userId == null) {
+            userId = userUpdateDTO.getId();
+            // 3. 双重校验，确保userId不为空
+            if (userId == null) {
+                log.error("用户ID为空，无法更新信息");
+            }
+            log.warn("从DTO中获取用户ID：{}（建议优先使用登录上下文）", userId);
+        }
+
+        log.info("正在修改的userId:{}", userId);
+
+        // 4. 调用服务层更新用户信息
+        User updatedUser = userService.updateUserInfo(userId, userUpdateDTO);
+        return ResultUtils.success(updatedUser);
+
+    }
 
 }

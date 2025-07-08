@@ -8,6 +8,7 @@ import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.UserMapper;
+import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.enums.user.UserRole;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
@@ -272,6 +273,139 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         BaseContext.setCurrentId(userId);
 
         return currentUser;
+    }
+
+    /**
+     * 更新用户信息（支持部分字段更新）
+     *
+     * @param userId        用户ID（当前登录用户）
+     * @param userUpdateDTO 待更新的用户信息DTO
+     * @return 更新后的用户实体
+     */
+    @Override
+    public User updateUserInfo(Long userId, UserUpdateDTO userUpdateDTO) {
+        // 1. 校验用户是否存在
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOTFOUND);
+        }
+
+        // 标记是否需要重新计算每日热量
+        boolean needRecalculateCalories = false;
+        // 记录原始体重和目标体重（用于对比是否变化）
+        BigDecimal originalWeight = user.getWeight();
+        BigDecimal originalTargetWeight = user.getTargetWeight();
+
+        // 2. 处理头像URL
+        if (userUpdateDTO.getAvatar() != null && !userUpdateDTO.getAvatar().trim().isEmpty()) {
+            user.setAvatar(userUpdateDTO.getAvatar());
+        }
+
+        // 3. 处理昵称
+        if (userUpdateDTO.getNickname() != null && !userUpdateDTO.getNickname().trim().isEmpty()) {
+            if (userUpdateDTO.getNickname().length() > 50) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称长度不能超过50字符");
+            }
+            user.setNickname(userUpdateDTO.getNickname());
+        }
+
+        // 4. 处理生日
+        if (userUpdateDTO.getBirthday() != null) {
+            user.setBirthday(userUpdateDTO.getBirthday());
+        }
+
+        // 5. 处理身高
+        boolean isHeightUpdated = false;
+        if (userUpdateDTO.getHeight() != null) {
+            if (userUpdateDTO.getHeight().compareTo(new BigDecimal("50")) < 0
+                    || userUpdateDTO.getHeight().compareTo(new BigDecimal("250")) > 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "身高范围应在50-250cm之间");
+            }
+            user.setHeight(userUpdateDTO.getHeight());
+            isHeightUpdated = true;
+        }
+
+        // 6. 处理体重（变化时需要重新计算热量）
+        boolean isWeightUpdated = false;
+        if (userUpdateDTO.getWeight() != null) {
+            if (userUpdateDTO.getWeight().compareTo(new BigDecimal("10")) < 0
+                    || userUpdateDTO.getWeight().compareTo(new BigDecimal("300")) > 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "体重范围应在10-300kg之间");
+            }
+            // 对比原始体重，判断是否变化
+            if (!userUpdateDTO.getWeight().equals(originalWeight)) {
+                user.setWeight(userUpdateDTO.getWeight());
+                isWeightUpdated = true;
+                needRecalculateCalories = true; // 体重变化，需要重新计算热量
+            }
+        }
+
+        // 7. 处理目标体重（变化时需要重新计算热量）
+        if (userUpdateDTO.getTargetWeight() != null) {
+            if (user.getWeight() != null && userUpdateDTO.getTargetWeight().compareTo(new BigDecimal("5")) < 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "目标体重不能低于5kg");
+            }
+            // 对比原始目标体重，判断是否变化
+            if (!userUpdateDTO.getTargetWeight().equals(originalTargetWeight)) {
+                user.setTargetWeight(userUpdateDTO.getTargetWeight());
+                needRecalculateCalories = true; // 目标体重变化，需要重新计算热量
+            }
+        }
+
+        // 8. 处理性别
+        if (userUpdateDTO.getGender() != null) {
+            if (userUpdateDTO.getGender() < 0 || userUpdateDTO.getGender() > 2) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "性别参数无效（0-未知，1-男，2-女）");
+            }
+            user.setGender(userUpdateDTO.getGender());
+        }
+
+        // 9. 重新计算BMI（身高或体重变化时）
+        if (isWeightUpdated || isHeightUpdated) {
+            BigDecimal newBmi = calculateBmi(user.getWeight(), user.getHeight());
+            user.setBmi(newBmi);
+        }
+
+        // 10. 重新计算每日热量（体重或目标体重变化时）
+        if (needRecalculateCalories) {
+            // 计算基础代谢率(BMR)
+            BigDecimal bmr = calculateBmr(
+                    userId,
+                    user.getWeight(),
+                    user.getHeight(),
+                    user.getGender(),
+                    user.getBirthday()
+            );
+            bmr = bmr != null ? bmr : getDefaultBmr(user.getGender());
+
+            // 计算每日总消耗热量(TDEE)
+            BigDecimal tdee = bmr.multiply(DEFAULT_ACTIVITY_FACTOR);
+
+            // 关键修改：使用DTO中的periodDays（目标天数）计算每日热量
+            Integer periodDays = userUpdateDTO.getPeriodDays(); // 从DTO获取目标天数
+            BigDecimal dailyCalories = calculateDailyCalories(
+                    user.getWeight(),       // 当前体重（已更新后的值）
+                    user.getTargetWeight(), // 目标体重（已更新后的值）
+                    periodDays,             // DTO中的目标天数
+                    tdee
+            );
+
+            user.setDailyCalories(dailyCalories);
+            log.info("用户{}因体重/目标体重变化，基于{}天周期重新计算每日热量: {}大卡",
+                    userId, periodDays, dailyCalories);
+        }
+
+        // 11. 更新时间戳
+        user.setUpdateTime(new Date());
+
+        // 12. 执行数据库更新
+        int rows = userMapper.updateById(user);
+        if (rows == 0) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新用户信息失败");
+        }
+
+        // 13. 返回更新后的用户信息
+        return userMapper.selectById(userId);
     }
 
 }
