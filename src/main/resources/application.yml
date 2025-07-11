@@ -43,7 +43,7 @@ spring:
       host: ${spring.data.redis.host}
       port: ${spring.data.redis.port}
       password: ${spring.data.redis.password}
-      timeout: 5000
+      timeout: 10000
     mongodb:
       uri: ${spring.data.mongodb.uri}
       username: ${spring.data.mongodb.username}

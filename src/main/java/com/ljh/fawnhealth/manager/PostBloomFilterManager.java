@@ -2,15 +2,19 @@ package com.ljh.fawnhealth.manager;
 
 import com.ljh.fawnhealth.model.vo.communityPosts.CommunityPostsVO;
 import com.ljh.fawnhealth.service.CommunityPostsService;
+import jakarta.annotation.PostConstruct;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.Resource;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 布隆过滤器
@@ -41,6 +45,22 @@ public class PostBloomFilterManager implements InitializingBean {
         }
     }
 
+    // 添加定期重置方法
+    @Scheduled(cron = "0 0 * * * ?") // 每1小时点执行一次
+    public void resetBloomFilter() {
+        List<Long> currentPostIds = communityPostsService.selectAllCommunityPosts()
+                .stream()
+                .map(CommunityPostsVO::getId)
+                .collect(Collectors.toList());
+
+        // 删除旧的布隆过滤器
+        RBloomFilter<Long> oldFilter = redissonClient.getBloomFilter(POST_ID_BLOOM_FILTER);
+        oldFilter.delete();
+
+        // 创建并初始化新的布隆过滤器
+        initBloomFilter(currentPostIds);
+    }
+
     public boolean mightContain(Long postId) {
         RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(POST_ID_BLOOM_FILTER);
         return bloomFilter.contains(postId);
@@ -53,8 +73,12 @@ public class PostBloomFilterManager implements InitializingBean {
 
     public void initBloomFilter(List<Long> allPostIds) {
         RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(POST_ID_BLOOM_FILTER);
-        bloomFilter.tryInit(100_000L, 0.01); // 初始化参数
-        allPostIds.forEach(bloomFilter::add); // 批量添加ID
+        bloomFilter.tryInit(100_000L, 0.01);
+        allPostIds.forEach(bloomFilter::add);
+
+        // 设置过期时间10分钟
+        redissonClient.getKeys().expire(POST_ID_BLOOM_FILTER, 60, TimeUnit.MINUTES);
+
         System.out.println("布隆过滤器初始化：添加 " + allPostIds.size() + " 个帖子ID");
     }
 

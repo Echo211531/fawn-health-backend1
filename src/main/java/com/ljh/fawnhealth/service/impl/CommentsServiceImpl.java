@@ -7,21 +7,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
-import com.ljh.fawnhealth.handler.PromotionMqHandler;
 import com.ljh.fawnhealth.manager.BannedWordsManager;
 import com.ljh.fawnhealth.manager.PostBloomFilterManager;
-import com.ljh.fawnhealth.mapper.CommentLikesMapper;
-import com.ljh.fawnhealth.mapper.CommentsMapper;
-import com.ljh.fawnhealth.mapper.CommunityPostsMapper;
-import com.ljh.fawnhealth.mapper.UserMapper;
-import com.ljh.fawnhealth.model.dto.comments.CommentAddDTO;
-import com.ljh.fawnhealth.model.dto.comments.CommentQueryDTO;
-import com.ljh.fawnhealth.model.dto.comments.CommentVO;
-import com.ljh.fawnhealth.model.dto.comments.LikeEventDTO;
-import com.ljh.fawnhealth.model.entity.CommentLikes;
-import com.ljh.fawnhealth.model.entity.Comments;
-import com.ljh.fawnhealth.model.entity.CommunityPosts;
-import com.ljh.fawnhealth.model.entity.User;
+import com.ljh.fawnhealth.mapper.*;
+import com.ljh.fawnhealth.model.dto.comments.*;
+import com.ljh.fawnhealth.model.entity.*;
 import com.ljh.fawnhealth.mq.MessageProducer;
 import com.ljh.fawnhealth.mq.MqConstant;
 import com.ljh.fawnhealth.service.CommentsService;
@@ -32,6 +22,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -48,16 +39,7 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
     private UserMapper userMapper;
 
     @Resource
-    private CommentLikesMapper commentLikesMapper;
-
-    @Resource
     private CommunityPostsMapper communityPostsMapper;
-
-    @Resource
-    private PostBloomFilterManager postBloomFilterManager;
-
-    @Resource
-    private BannedWordsManager bannedWordsManager;
 
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
@@ -65,6 +47,11 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
     @Resource
     private MessageProducer messageProducer;
 
+    @Resource
+    private PostBloomFilterManager postBloomFilterManager;
+
+    @Resource
+    private BannedWordsManager bannedWordsManager;
 
     /**
      * 添加评论或回复（支持帖子一级评论和评论的评论）
@@ -155,88 +142,105 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
      * 分页查询评论列表，包含楼中楼结构
      *
      * @param dto 查询参数（postId、分页页码、每页大小）
-     * @return
+     * @return 评论VO列表
      */
     @Override
     public List<CommentVO> listCommentsByPostId(CommentQueryDTO dto) {
-        // 构建Redis缓存键，格式为"comments:post:{postId}:page:{pageNum}"
         String redisKey = "comments:post:" + dto.getPostId() + ":page:" + dto.getPageNum();
         ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
-        // 1. 优先从Redis缓存中获取评论列表
         Object cache = ops.get(redisKey);
         if (cache != null) {
-            // 缓存命中，直接返回缓存数据
             return (List<CommentVO>) cache;
         }
 
-        // 2. 缓存未命中，查询数据库
-        // 创建分页对象，指定页码和每页大小
-        Page<Comments> page = new Page<>(dto.getPageNum(), dto.getPageSize());
-        // 构建查询条件：查询指定帖子下的一级评论（parent_id=0），且状态正常、未删除，按创建时间倒序排列
-        QueryWrapper<Comments> wrapper = new QueryWrapper<>();
-        wrapper.eq("post_id", dto.getPostId())
-                .eq("parent_id", 0)
-                .eq("status", 0)
-                .eq("is_delete", 0)
-                .orderByDesc("create_time");
-
-        // 执行分页查询获取一级评论列表
-        List<Comments> topComments = commentsMapper.selectPage(page, wrapper).getRecords();
-        if (topComments.isEmpty()) {
-            // 若无一级评论，直接返回空列表
-            return Collections.emptyList();
-        }
-
-        // 获取所有一级评论的ID列表，用于查询子评论
-        List<Long> topIds = topComments.stream().map(Comments::getId).toList();
-
-        // 查询所有一级评论的子评论，条件为父ID在一级评论ID列表中，状态正常、未删除，按创建时间正序排列
-        List<Comments> childComments = commentsMapper.selectList(
+        // 1. 查询所有评论
+        List<Comments> allComments = commentsMapper.selectList(
                 new QueryWrapper<Comments>()
-                        .in("parent_id", topIds)
+                        .eq("post_id", dto.getPostId())
                         .eq("status", 0)
                         .eq("is_delete", 0)
                         .orderByAsc("create_time")
         );
+        if (allComments.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        // 收集所有评论涉及的用户ID（去重），用于批量查询用户信息
-        Set<Long> userIds = new HashSet<>();
-        topComments.forEach(c -> userIds.add(c.getUserId()));
-        childComments.forEach(c -> userIds.add(c.getUserId()));
+        // 2. 按 parentId 分组
+        Map<Long, List<Comments>> parentIdMap = allComments.stream()
+                .collect(Collectors.groupingBy(c -> c.getParentId() == null ? 0L : c.getParentId()));
 
-        // 批量查询用户信息并构建ID到用户对象的映射表
+        // 3. 用户信息
+        Set<Long> userIds = allComments.stream().map(Comments::getUserId).collect(Collectors.toSet());
         Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        // 将子评论按父ID分组，构建父ID到子评论VO列表的映射
-        Map<Long, List<CommentVO>> childMap = new HashMap<>();
-        for (Comments child : childComments) {
-            // 转换子评论为VO对象（包含用户信息和当前用户是否已点赞）
-            CommentVO vo = toVO(child, userMap, dto.getCurrentUserId());
-            // 将VO对象添加到对应的父评论分组中
-            childMap.computeIfAbsent(child.getParentId(), k -> new ArrayList<>()).add(vo);
+        // 4. 所有评论Map
+        Map<Long, Comments> allCommentsMap = allComments.stream()
+                .collect(Collectors.toMap(Comments::getId, c -> c));
+
+        // 5. 分页一级评论
+        List<Comments> topComments = parentIdMap.getOrDefault(0L, new ArrayList<>());
+        int fromIndex = (dto.getPageNum() - 1) * dto.getPageSize();
+        int toIndex = Math.min(fromIndex + dto.getPageSize(), topComments.size());
+        if (fromIndex >= topComments.size()) {
+            return Collections.emptyList();
+        }
+        List<Comments> pageTopComments = topComments.subList(fromIndex, toIndex);
+
+        // 6. 平铺组装
+        List<CommentVO> result = new ArrayList<>();
+        for (Comments top : pageTopComments) {
+            CommentVO vo = convertToVO(top, userMap, dto.getCurrentUserId(), allCommentsMap);
+            vo.setReplies(collectAllRepliesFlat(top.getId(), parentIdMap, userMap, dto.getCurrentUserId(), allCommentsMap));
+            result.add(vo);
         }
 
-        // 将一级评论转换为VO对象，并关联其子评论列表
-        List<CommentVO> result = topComments.stream().map(top -> {
-            CommentVO vo = toVO(top, userMap, dto.getCurrentUserId());
-            vo.setReplies(childMap.getOrDefault(top.getId(), new ArrayList<>()));
-            return vo;
-        }).collect(Collectors.toList());
+//        // 6. 递归组装
+//        List<CommentVO> result = new ArrayList<>();
+//        for (Comments top : pageTopComments) {
+//            CommentVO vo = convertToVO(top, userMap, dto.getCurrentUserId(), allCommentsMap);
+//            vo.setReplies(buildTree(top.getId(), parentIdMap, userMap, dto.getCurrentUserId(), allCommentsMap));
+//            result.add(vo);
+//        }
 
-        // 3. 将组装好的评论列表存入Redis缓存，设置5分钟过期时间
-        ops.set(redisKey, result, 5, java.util.concurrent.TimeUnit.MINUTES);
-        // 返回结果
+        ops.set(redisKey, result, 5, TimeUnit.MINUTES);
         return result;
     }
 
+    // 递归方法
+    private List<CommentVO> buildTree(Long parentId, Map<Long, List<Comments>> parentIdMap,
+                                      Map<Long, User> userMap, Long currentUserId, Map<Long, Comments> allCommentsMap) {
+        List<Comments> children = parentIdMap.getOrDefault(parentId, new ArrayList<>());
+        List<CommentVO> result = new ArrayList<>();
+        for (Comments c : children) {
+            CommentVO vo = convertToVO(c, userMap, currentUserId, allCommentsMap);
+            vo.setReplies(buildTree(c.getId(), parentIdMap, userMap, currentUserId, allCommentsMap));
+            result.add(vo);
+        }
+        return result;
+    }
+
+    // 新增方法
+    private List<CommentVO> collectAllRepliesFlat(Long parentId, Map<Long, List<Comments>> parentIdMap,
+                                                  Map<Long, User> userMap, Long currentUserId, Map<Long, Comments> allCommentsMap) {
+        List<CommentVO> result = new ArrayList<>();
+        Queue<Comments> queue = new LinkedList<>(parentIdMap.getOrDefault(parentId, new ArrayList<>()));
+        while (!queue.isEmpty()) {
+            Comments c = queue.poll();
+            CommentVO vo = convertToVO(c, userMap, currentUserId, allCommentsMap);
+            vo.setReplies(null); // 或 Collections.emptyList()
+            result.add(vo);
+            queue.addAll(parentIdMap.getOrDefault(c.getId(), new ArrayList<>()));
+        }
+        return result;
+    }
 
     /**
      * 删除评论（逻辑删除）
      *
      * @param commentId 评论ID
-     * @param userId 当前登录用户ID
+     * @param userId    当前登录用户ID
      */
     @Override
     public void deleteComment(Long commentId, Long userId) {
@@ -278,8 +282,6 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         // 清除缓存
         clearCommentCacheByPostId(comment.getPostId());
     }
-
-
 
     /**
      * 点赞/取消点赞评论（幂等处理）
@@ -326,27 +328,27 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         return newLikeState;
     }
 
-
-
-
     /**
-     * 将评论实体转换为视图对象 VO
+     * 将评论实体转换为视图对象VO
      *
-     * @param comment
-     * @param userMap
-     * @return
+     * @param comment       评论实体
+     * @param userMap       用户ID到用户对象的映射
+     * @param currentUserId 当前登录用户ID
+     * @return 评论VO对象
      */
-    private CommentVO toVO(Comments comment, Map<Long, User> userMap, Long currentUserId) {
+    private CommentVO convertToVO(Comments comment, Map<Long, User> userMap, Long currentUserId, Map<Long, Comments> allCommentsMap) {
         CommentVO vo = new CommentVO();
+        // 复制基本属性
         BeanUtils.copyProperties(comment, vo);
 
+        // 设置用户信息
         User user = userMap.get(comment.getUserId());
         if (user != null) {
             vo.setNickname(user.getNickname());
             vo.setAvatar(user.getAvatar());
         }
 
-        // 使用当前登录用户ID判断点赞状态
+        // 设置当前用户是否点赞
         if (currentUserId != null) {
             String userLikedKey = "comment:liked:user:" + currentUserId;
             Boolean liked = redisTemplate.opsForSet().isMember(userLikedKey, comment.getId());
@@ -355,6 +357,7 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
             vo.setLiked(false);
         }
 
+        // 设置点赞数（优先从Redis获取）
         String likeCountKey = "comment:like:count:" + comment.getId();
         Object countObj = redisTemplate.opsForValue().get(likeCountKey);
         if (countObj instanceof Integer count) {
@@ -365,10 +368,18 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
             vo.setLikeCount(comment.getLikeCount());
         }
 
+        // 设置被回复用户信息（仅对子评论/楼中楼有效）
+        if (comment.getParentId() != null && comment.getParentId() != 0) {
+            Comments parent = allCommentsMap.get(comment.getParentId());
+            if (parent != null) {
+                vo.setReplyToUserId(parent.getUserId());
+                User replyToUser = userMap.get(parent.getUserId());
+                vo.setReplyToUserNickname(replyToUser != null ? replyToUser.getNickname() : null);
+            }
+        }
+
         return vo;
     }
-
-
 
     private void clearCommentCacheByPostId(Long postId) {
         String pattern = "comments:post:" + postId + ":page:*";
@@ -377,5 +388,4 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
             redisTemplate.delete(keys);
         }
     }
-
 }

@@ -165,9 +165,13 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
 
         CommunityPosts post = communityPostsMapper.selectOne(queryWrapper);
         ThrowUtils.throwIf(post == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
-
+        Long userId = post.getUserId();
+        User user = userMapper.selectById(userId);
         CommunityPostsVO postVO = new CommunityPostsVO();
         BeanCopyUtils.copy(post, postVO);
+        postVO.setAvatar(user.getAvatar());
+        postVO.setNickname(user.getNickname());
+        postVO.setPostTypeDesc(getPostTypeDescription(post.getPostType()));
 
         // 使用 put 方法写入缓存（同时更新本地和 Redis）
         cacheManager.put(

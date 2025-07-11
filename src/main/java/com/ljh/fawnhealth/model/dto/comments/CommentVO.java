@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -60,9 +61,19 @@ public class CommentVO implements Serializable {
     private Boolean liked;
 
     /**
+     * 被评论人的ID
+     */
+    private Long replyToUserId;
+
+    /**
+     * 被评论人的昵称
+     */
+    private String replyToUserNickname;
+
+    /**
      * 评论时间
      */
-    private LocalDateTime createTime;
+    private Date createTime;
 
     /**
      * 子评论列表
