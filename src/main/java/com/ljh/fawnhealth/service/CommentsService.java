@@ -44,4 +44,12 @@ public interface CommentsService extends IService<Comments> {
      * @param userId 当前用户ID
      */
     boolean toggleLike(Long commentId, Long userId);
+
+    /**
+     * 根据用户ID查询用户的所有评论（App端使用，不分页）
+     *
+     * @param userId 用户ID
+     * @return
+     */
+    List<CommentVO> listCommentsByUserId(Long userId);
 }

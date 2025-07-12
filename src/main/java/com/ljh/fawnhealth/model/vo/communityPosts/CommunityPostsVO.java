@@ -57,7 +57,7 @@ public class CommunityPostsVO {
     /**
      * 是否公开: 0-私密, 1-公开
      */
-    private Boolean isPublic;
+    private int isPublic;
 
     /**
      * 图片URL,多个用逗号分隔

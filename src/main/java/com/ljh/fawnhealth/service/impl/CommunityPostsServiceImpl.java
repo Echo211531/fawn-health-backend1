@@ -1,5 +1,6 @@
 package com.ljh.fawnhealth.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -17,11 +18,13 @@ import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.enums.communityPosts.CommunityPostsType;
 import com.ljh.fawnhealth.model.vo.communityPosts.CommunityPostsVO;
 import com.ljh.fawnhealth.service.CommunityPostsService;
+import com.ljh.fawnhealth.service.UserService;
 import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import com.ljh.fawnhealth.manager.PostBloomFilterManager;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -66,6 +69,9 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private UserService userService;
 
     /**
      * 查询所有公开的社区帖子（带类型描述转换）
@@ -172,6 +178,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         postVO.setAvatar(user.getAvatar());
         postVO.setNickname(user.getNickname());
         postVO.setPostTypeDesc(getPostTypeDescription(post.getPostType()));
+        postVO.setIsPublic(post.getIsPublic());
 
         // 使用 put 方法写入缓存（同时更新本地和 Redis）
         cacheManager.put(
@@ -259,6 +266,90 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         }
 
         return newLikeState;
+    }
+
+    /**
+     * 根据用户ID查询帖子列表
+     *
+     * @param userId   用户ID
+     * @param isPublic 是否只查询公开帖子(1:公开,0:所有)
+     * @return 统一响应对象，包含帖子视图对象列表
+     */
+    @Override
+    public List<CommunityPostsVO> listPostsByUserId(Long userId, Integer isPublic) {
+        // 参数校验
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID无效");
+
+        // 构建查询条件
+        LambdaQueryWrapper<CommunityPosts> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CommunityPosts::getUserId, userId)
+                .eq(CommunityPosts::getIsDelete, 0);
+
+        // 根据参数决定查询公开/私密/所有帖子
+        if (isPublic != null) {
+            queryWrapper.eq(CommunityPosts::getIsPublic, isPublic);
+        }
+        // 如果isPublic为null，则不添加isPublic条件，查询所有帖子
+
+        // 按创建时间倒序排列
+        queryWrapper.orderByDesc(CommunityPosts::getCreateTime);
+
+        // 查询帖子列表
+        List<CommunityPosts> posts = this.list(queryWrapper);
+
+        // 转换为VO对象
+        return posts.stream().map(post -> {
+            CommunityPostsVO vo = new CommunityPostsVO();
+            BeanUtils.copyProperties(post, vo);
+
+            // 查询用户信息
+            User user = userService.getById(post.getUserId());
+            if (user != null) {
+                vo.setAvatar(user.getAvatar());
+                vo.setNickname(user.getNickname());
+            }
+
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * 删除帖子
+     *
+     * @param postId 帖子ID
+     * @param userId 当前操作用户ID
+     * @return 是否删除成功
+     */
+    @Override
+    public boolean deletePost(Long postId, Long userId) {
+        // 参数校验
+        ThrowUtils.throwIf(postId == null || postId <= 0, ErrorCode.PARAMS_ERROR, "帖子ID无效");
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID无效");
+
+        // 查询帖子信息
+        CommunityPosts post = this.getById(postId);
+        ThrowUtils.throwIf(post == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
+        ThrowUtils.throwIf(post.getIsDelete() == 1, ErrorCode.OPERATION_ERROR, "帖子已被删除");
+
+        // 查询用户信息
+        User user = userService.getById(userId);
+        ThrowUtils.throwIf(user == null, ErrorCode.USER_NOTFOUND);
+
+        // 检查权限：管理员或帖子所有者
+        boolean isAdmin = "admin".equals(user.getRole()) || "super_admin".equals(user.getRole());
+        boolean isOwner = post.getUserId().equals(userId);
+
+        if (!isAdmin && !isOwner) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权删除该帖子");
+        }
+
+        // 执行删除（逻辑删除）
+        CommunityPosts updatePost = new CommunityPosts();
+        updatePost.setId(postId);
+        updatePost.setIsDelete(1);
+        updatePost.setUpdateTime(new Date());
+
+        return this.updateById(updatePost);
     }
 
     /**

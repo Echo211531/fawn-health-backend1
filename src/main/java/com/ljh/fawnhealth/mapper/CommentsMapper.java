@@ -3,6 +3,9 @@ package com.ljh.fawnhealth.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ljh.fawnhealth.model.entity.Comments;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
 * @author 27105
@@ -26,6 +29,8 @@ public interface CommentsMapper extends BaseMapper<Comments> {
      */
     int decreaseLikeCount(@Param("commentId") Long commentId);
 
+    @Select("SELECT * FROM comments WHERE user_id = #{userId} AND is_delete = 0 ORDER BY create_time DESC")
+    List<Comments> selectByUserId(Long userId);
 }
 
 

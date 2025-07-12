@@ -15,6 +15,7 @@ import com.ljh.fawnhealth.model.entity.*;
 import com.ljh.fawnhealth.mq.MessageProducer;
 import com.ljh.fawnhealth.mq.MqConstant;
 import com.ljh.fawnhealth.service.CommentsService;
+import com.ljh.fawnhealth.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 评论服务实现类（支持多级嵌套与逻辑删除、点赞等）
@@ -52,6 +54,9 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
 
     @Resource
     private BannedWordsManager bannedWordsManager;
+
+    @Resource
+    private UserService userService;
 
     /**
      * 添加评论或回复（支持帖子一级评论和评论的评论）
@@ -326,6 +331,52 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         clearCommentCacheByPostId(comment.getPostId());
 
         return newLikeState;
+    }
+
+    /**
+     * 根据用户ID查询用户的所有评论（App端使用，不分页）
+     *
+     * @param userId 用户ID
+     * @return
+     */
+    @Override
+    public List<CommentVO> listCommentsByUserId(Long userId) {
+        // 1. 查询所有未删除的评论（按时间倒序）
+        List<Comments> comments = commentsMapper.selectByUserId(userId);
+
+        // 2. 批量查询关联用户信息（优化性能）
+        Set<Long> userIds = comments.stream()
+                .flatMap(comment -> Stream.of(
+                        comment.getUserId(),
+                        comment.getReplyToUserId()
+                ))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, User> userMap = userService.getUserMapByIds(userIds);
+
+        // 3. 转换为VO
+        return comments.stream().map(comment -> {
+            CommentVO vo = new CommentVO();
+            BeanUtils.copyProperties(comment, vo);
+
+            // 设置用户信息
+            User user = userMap.get(comment.getUserId());
+            if (user != null) {
+                vo.setAvatar(user.getAvatar());
+                vo.setNickname(user.getNickname());
+            }
+
+            // 设置被回复用户信息
+            if (comment.getReplyToUserId() != null) {
+                User replyUser = userMap.get(comment.getReplyToUserId());
+                if (replyUser != null) {
+                    vo.setReplyToUserNickname(replyUser.getNickname());
+                }
+            }
+
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     /**
