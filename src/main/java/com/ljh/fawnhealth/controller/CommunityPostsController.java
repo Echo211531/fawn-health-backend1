@@ -180,4 +180,34 @@ public class CommunityPostsController {
         return ResultUtils.success(hotPosts);
     }
 
+    /**
+     * 根据用户ID查询帖子列表
+     *
+     * @param userId 用户ID
+     * @param isPublic 是否只查询公开帖子(1:公开,0:私密)
+     * @return 统一响应对象，包含帖子视图对象列表
+     */
+    @GetMapping("/listByUserId")
+    public BaseResponse<List<CommunityPostsVO>> listPostsByUserId(
+            @RequestParam Long userId,
+            @RequestParam(required = false) Integer isPublic) {  // 移除默认值，改为可选参数
+        List<CommunityPostsVO> list = communityPostsService.listPostsByUserId(userId, isPublic);
+        return ResultUtils.success(list);
+    }
+
+    /**
+     * 删除帖子接口
+     * @param postId 要删除的帖子ID
+     * @param userId 当前操作用户ID
+     * @return 统一响应对象，包含操作结果
+     */
+    @PostMapping("/deletePost")
+    public BaseResponse<Boolean> deletePost(@RequestParam Long postId, @RequestParam Long userId) {
+        // 校验用户ID
+        ThrowUtils.throwIf(userId == null, ErrorCode.USER_NOTFOUND);
+
+        boolean result = communityPostsService.deletePost(postId, userId);
+        return ResultUtils.success(result);
+    }
+
 }

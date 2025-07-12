@@ -7,6 +7,8 @@ import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Set;
 
 
 public interface UserService extends IService<User> {
@@ -37,4 +39,9 @@ public interface UserService extends IService<User> {
      * @return 更新后的用户信息
      */
     User updateUserInfo(Long userId, UserUpdateDTO userUpdateDTO);
+
+    /**
+     * 批量获取用户信息
+     */
+    Map<Long, User> getUserMapByIds(Set<Long> userIds);
 }

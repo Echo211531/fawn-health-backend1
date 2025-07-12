@@ -18,12 +18,15 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.stereotype.Service;
 
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.ljh.fawnhealth.constant.UserConstant.USER_LOGIN_STATE;
 
@@ -406,6 +409,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
         // 13. 返回更新后的用户信息
         return userMapper.selectById(userId);
+    }
+
+    /**
+     * 批量获取用户信息
+     *
+     * @param userIds
+     */
+    @Override
+    public Map<Long, User> getUserMapByIds(Set<Long> userIds) {
+        if (CollectionUtils.isEmpty(userIds)) {
+            return Collections.emptyMap();
+        }
+        List<User> users = userMapper.selectBatchIds(userIds);
+        return users.stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
     }
 
 }

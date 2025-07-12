@@ -100,4 +100,21 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
 
 
     boolean toggleLike(Long postId, Long userId);
+
+    /**
+     * 根据用户ID查询帖子列表
+     *
+     * @param userId 用户ID
+     * @param isPublic 是否只查询公开帖子(1:公开,0:所有)
+     * @return 统一响应对象，包含帖子视图对象列表
+     */
+    List<CommunityPostsVO> listPostsByUserId(Long userId, Integer isPublic);
+
+    /**
+     * 删除帖子
+     * @param postId 帖子ID
+     * @param userId 当前操作用户ID
+     * @return 是否删除成功
+     */
+    boolean deletePost(Long postId, Long userId);
 }

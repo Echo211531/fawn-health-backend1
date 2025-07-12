@@ -71,4 +71,15 @@ public class CommentController {
         boolean liked = commentsService.toggleLike(commentId, userId);
         return liked ? ResultUtils.success("点赞成功") : ResultUtils.success("取消点赞成功");
     }
+
+    /**
+     * 根据用户ID查询用户的所有评论（App端使用，不分页）
+     *
+     * @param userId 用户ID
+     */
+    @GetMapping("/listByUser")
+    public BaseResponse<List<CommentVO>> listCommentsByUser(@RequestParam Long userId) {
+        List<CommentVO> comments = commentsService.listCommentsByUserId(userId);
+        return ResultUtils.success(comments);
+    }
 }
