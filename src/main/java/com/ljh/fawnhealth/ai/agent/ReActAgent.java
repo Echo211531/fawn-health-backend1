@@ -1,7 +1,17 @@
 package com.ljh.fawnhealth.ai.agent;
 
+import com.ljh.fawnhealth.ai.agent.model.AgentState;
+import com.ljh.fawnhealth.ai.agent.model.StreamEventType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.Map;
 
 /**
  * ReAct (Reasoning and Acting) 模式的代理抽象类  
@@ -9,38 +19,67 @@ import lombok.EqualsAndHashCode;
  */  
 @EqualsAndHashCode(callSuper = true)
 @Data
-public abstract class ReActAgent extends BaseAgent {  
-    /**  
+@Slf4j
+public abstract class ReActAgent extends BaseAgent {
+    // 添加默认构造函数解决 Lombok 要求
+    public ReActAgent() {
+        super(null); // 传递 null 给父类
+    }
+    // 添加带 chatId 的构造函数
+    public ReActAgent(String chatId) {
+        super(chatId);
+    }
+    /**
+     * 流式步骤执行
+     */
+    @Override
+    protected void streamStep(SseEmitter emitter) throws Exception {
+        // 添加状态检查
+        if (getState() == AgentState.FINISHED) {
+            log.info("状态已为FINISHED，跳过步骤");
+            return;
+        }
+        // 1. 思考阶段
+        boolean shouldAct = think(emitter);
+        // 2. 执行阶段（如果需要）
+        if (shouldAct && getState() != AgentState.FINISHED) {
+            act(emitter);
+        }
+    }
+    /**
      * 处理当前状态并决定下一步行动  
      *  
      * @return 是否需要执行行动，true表示需要执行，false表示不需要执行  
      */  
-    public abstract boolean think();  
+    public abstract boolean think(SseEmitter emitter) throws Exception;
   
     /**  
      * 执行决定的行动  
      *  
      * @return 行动执行结果  
      */  
-    public abstract String act();  
-  
-    /**  
-     * 执行单个步骤：思考和行动  
-     *  
-     * @return 步骤执行结果  
-     */  
-    @Override  
-    public String step() {  
-        try {  
-            boolean shouldAct = think();  
-            if (!shouldAct) {  
-                return "思考完成 - 无需行动";  
-            }  
-            return act();  
-        } catch (Exception e) {  
-            // 记录异常日志  
-            e.printStackTrace();  
-            return "步骤执行失败: " + e.getMessage();  
-        }  
-    }  
+    public abstract String act(SseEmitter emitter);
+
+    /**
+     * 执行单个步骤：思考和行动
+     *
+     * @return 步骤执行结果
+     */
+    @Override
+    public String step() {
+        try {
+            // 1. 构建 SSE 事件
+            SseEmitter emitter = new SseEmitter();
+            sendStreamEvent(emitter, StreamEventType.THINKING, "思考中...");
+            boolean shouldAct = think(emitter);
+            if (!shouldAct) {
+                return "思考完成 - 无需行动";
+            }
+            return act(emitter);
+        } catch (Exception e) {
+            // 记录异常日志
+            e.printStackTrace();
+            return "步骤执行失败: " + e.getMessage();
+        }
+    }
 }

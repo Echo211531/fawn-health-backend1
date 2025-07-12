@@ -331,3 +331,9 @@ CREATE TABLE `comment_likes` (
                                  KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论点赞表';
 
+ALTER TABLE `user`
+    ADD COLUMN `daily_calories` decimal(10,2) DEFAULT NULL COMMENT '每日建议摄入热量(大卡)';
+-- 追加每日热量摄入字段
+-- 为每日热量字段添加索引（可选，根据查询需求决定）
+ALTER TABLE `user`
+    ADD INDEX `idx_daily_calories` (`daily_calories`) COMMENT '每日热量索引';

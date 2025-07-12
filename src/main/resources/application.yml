@@ -61,12 +61,17 @@ spring:
       password: ${spring.datasource.postgres.password}
       driver-class-name: org.postgresql.Driver
 
+  # session 配置
+  session:
+    store-type: redis
+    # session 1 天过期
+    timeout: 86400
   mail:
-    host: smtp.163.com
-    protocol: smtps
+    host: smtp.qq.com
     port: 587
     username: ${spring.mail.username}
     password: ${spring.mail.password}
+    protocol: smtp
     nickname: 小鹿健康
     default-encoding: UTF-8
     test-connection: false
