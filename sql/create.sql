@@ -337,3 +337,172 @@ ALTER TABLE `user`
 -- 为每日热量字段添加索引（可选，根据查询需求决定）
 ALTER TABLE `user`
     ADD INDEX `idx_daily_calories` (`daily_calories`) COMMENT '每日热量索引';
+
+
+CREATE TABLE `product` (
+                           `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品ID',
+                           `name` varchar(100) NOT NULL COMMENT '商品名称',
+                           `category_id` bigint NOT NULL COMMENT '分类ID',
+                           `description` text COMMENT '商品描述',
+                           `price` decimal(10,2) NOT NULL COMMENT '商品价格',
+                           `original_price` decimal(10,2) COMMENT '原价',
+                           `stock` int NOT NULL DEFAULT 0 COMMENT '库存数量',
+                           `sales` int NOT NULL DEFAULT 0 COMMENT '销量',
+                           `main_image` varchar(255) COMMENT '主图URL',
+                           `sub_images` varchar(1000) COMMENT '子图URL，多个用逗号分隔',
+                           `detail` text COMMENT '商品详情',
+                           `specs` text COMMENT '商品规格，JSON格式',
+                           `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：0-下架，1-上架，2-缺货',
+                           `weight` decimal(8,2) COMMENT '商品重量(g)',
+                           `is_hot` tinyint DEFAULT 0 COMMENT '是否热销：0-否，1-是',
+                           `is_recommend` tinyint DEFAULT 0 COMMENT '是否推荐：0-否，1-是',
+                           `sort_order` int DEFAULT 0 COMMENT '排序权重',
+                           `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                           `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                           `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                           PRIMARY KEY (`id`),
+                           KEY `idx_category` (`category_id`),
+                           KEY `idx_status` (`status`),
+                           KEY `idx_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品表';
+
+CREATE TABLE `product_category` (
+                                    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '分类ID',
+                                    `parent_id` bigint DEFAULT 0 COMMENT '父分类ID，0表示一级分类',
+                                    `name` varchar(50) NOT NULL COMMENT '分类名称',
+                                    `level` tinyint  NULL COMMENT '分类层级：1-一级，2-二级，3-三级',
+                                    `icon` varchar(255) COMMENT '分类图标',
+                                    `description` varchar(255) COMMENT '分类描述',
+                                    `sort_order` int DEFAULT 0 COMMENT '排序权重',
+                                    `status` tinyint DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+                                    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                    `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                                    PRIMARY KEY (`id`),
+                                    KEY `idx_parent` (`parent_id`),
+                                    KEY `idx_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品分类表';
+
+CREATE TABLE `cart` (
+                        `id` bigint NOT NULL AUTO_INCREMENT COMMENT '购物车ID',
+                        `user_id` bigint NOT NULL COMMENT '用户ID',
+                        `product_id` bigint NOT NULL COMMENT '商品ID',
+                        `quantity` int NOT NULL DEFAULT 1 COMMENT '数量',
+                        `selected` tinyint NOT NULL DEFAULT 1 COMMENT '是否选中：0-否，1-是',
+                        `specs` json COMMENT '商品规格，JSON格式',
+                        `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                        `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                        `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                        PRIMARY KEY (`id`),
+                        UNIQUE KEY `idx_user_product` (`user_id`, `product_id`),
+                        KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='购物车表';
+
+CREATE TABLE `order` (
+                         `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单ID',
+                         `order_no` varchar(50) NOT NULL COMMENT '订单编号',
+                         `user_id` bigint NOT NULL COMMENT '用户ID',
+                         `total_amount` decimal(10,2) NOT NULL COMMENT '订单总金额',
+                         `payment_amount` decimal(10,2) NOT NULL COMMENT '实付金额',
+                         `freight_amount` decimal(10,2) DEFAULT 0 COMMENT '运费',
+                         `discount_amount` decimal(10,2) DEFAULT 0 COMMENT '优惠金额',
+                         `coupon_amount` decimal(10,2) DEFAULT 0 COMMENT '优惠券抵扣金额',
+                         `payment_type` tinyint COMMENT '支付方式：1-支付宝，2-微信，3-银联',
+                         `payment_time` datetime COMMENT '支付时间',
+                         `payment_serial_number` varchar(100) COMMENT '支付流水号',
+                         `status` tinyint NOT NULL DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付待发货，2-已发货，3-已完成，4-已取消，5-已退款，6-已关闭',
+                         `delivery_company` varchar(50) COMMENT '物流公司',
+                         `delivery_no` varchar(50) COMMENT '物流单号',
+                         `delivery_time` datetime COMMENT '发货时间',
+                         `receive_time` datetime COMMENT '收货时间',
+                         `note` varchar(500) COMMENT '订单备注',
+                         `source` tinyint COMMENT '订单来源：1-PC，2-APP，3-小程序，4-H5',
+                         `confirm_status` tinyint DEFAULT 0 COMMENT '确认收货状态：0-未确认，1-已确认',
+                         `delete_status` tinyint DEFAULT 0 COMMENT '删除状态：0-未删除，1-已删除',
+                         `coupon_id` bigint COMMENT '使用的优惠券ID',
+                         `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                         `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                         `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                         PRIMARY KEY (`id`),
+                         UNIQUE KEY `idx_order_no` (`order_no`),
+                         KEY `idx_user` (`user_id`),
+                         KEY `idx_status` (`status`),
+                         KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
+
+CREATE TABLE `order_item` (
+                              `id` bigint NOT NULL AUTO_INCREMENT COMMENT '订单商品ID',
+                              `order_id` bigint NOT NULL COMMENT '订单ID',
+                              `order_no` varchar(50) NOT NULL COMMENT '订单编号',
+                              `product_id` bigint NOT NULL COMMENT '商品ID',
+                              `product_name` varchar(100) NOT NULL COMMENT '商品名称',
+                              `product_image` varchar(255) COMMENT '商品图片',
+                              `current_price` decimal(10,2) NOT NULL COMMENT '下单时的商品单价',
+                              `quantity` int NOT NULL COMMENT '购买数量',
+                              `total_price` decimal(10,2) NOT NULL COMMENT '商品总价',
+                              `specs` json COMMENT '商品规格，JSON格式',
+                              `refund_status` tinyint DEFAULT 0 COMMENT '退款状态：0-未退款，1-退款中，2-已退款',
+                              `refund_amount` decimal(10,2) DEFAULT 0 COMMENT '退款金额',
+                              `refund_time` datetime COMMENT '退款时间',
+                              `refund_reason` varchar(255) COMMENT '退款原因',
+                              `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                              `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                              `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                              PRIMARY KEY (`id`),
+                              KEY `idx_order` (`order_id`),
+                              KEY `idx_product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单商品明细表';
+
+CREATE TABLE `shipping_address` (
+                                    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '地址ID',
+                                    `user_id` bigint NOT NULL COMMENT '用户ID',
+                                    `receiver_name` varchar(50) NOT NULL COMMENT '收货人姓名',
+                                    `receiver_phone` varchar(20) NOT NULL COMMENT '收货人电话',
+                                    `province` varchar(50) NOT NULL COMMENT '省',
+                                    `city` varchar(50) NOT NULL COMMENT '市',
+                                    `district` varchar(50) NOT NULL COMMENT '区',
+                                    `detail_address` varchar(255) NOT NULL COMMENT '详细地址',
+                                    `postal_code` varchar(20) COMMENT '邮政编码',
+                                    `is_default` tinyint DEFAULT 0 COMMENT '是否默认地址：0-否，1-是',
+                                    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                    `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                                    PRIMARY KEY (`id`),
+                                    KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='收货地址表';
+
+CREATE TABLE `order_operation_log` (
+                                       `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+                                       `order_id` bigint NOT NULL COMMENT '订单ID',
+                                       `order_no` varchar(50) NOT NULL COMMENT '订单编号',
+                                       `operator` varchar(50) COMMENT '操作人，用户ID或管理员ID',
+                                       `operation_type` tinyint NOT NULL COMMENT '操作类型：1-创建订单，2-支付订单，3-发货，4-确认收货，5-取消订单，6-申请退款，7-退款成功，8-订单完成',
+                                       `operation_note` varchar(255) COMMENT '操作备注',
+                                       `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                       `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                                       PRIMARY KEY (`id`),
+                                       KEY `idx_order` (`order_id`),
+                                       KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单操作日志表';
+
+CREATE TABLE `refund_application` (
+                                      `id` bigint NOT NULL AUTO_INCREMENT COMMENT '退款ID',
+                                      `order_id` bigint NOT NULL COMMENT '订单ID',
+                                      `order_no` varchar(50) NOT NULL COMMENT '订单编号',
+                                      `user_id` bigint NOT NULL COMMENT '用户ID',
+                                      `refund_amount` decimal(10,2) NOT NULL COMMENT '退款金额',
+                                      `refund_type` tinyint NOT NULL COMMENT '退款类型：1-仅退款，2-退货退款',
+                                      `refund_reason` varchar(255) NOT NULL COMMENT '退款原因',
+                                      `refund_remark` varchar(500) COMMENT '退款说明',
+                                      `status` tinyint NOT NULL DEFAULT 0 COMMENT '退款状态：0-待处理，1-处理中，2-退款成功，3-退款失败，4-已取消',
+                                      `handle_time` datetime COMMENT '处理时间',
+                                      `handle_note` varchar(500) COMMENT '处理备注',
+                                      `handler_id` bigint COMMENT '处理人ID',
+                                      `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                      `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                      `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+                                      PRIMARY KEY (`id`),
+                                      KEY `idx_order` (`order_id`),
+                                      KEY `idx_user` (`user_id`),
+                                      KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退款申请表';

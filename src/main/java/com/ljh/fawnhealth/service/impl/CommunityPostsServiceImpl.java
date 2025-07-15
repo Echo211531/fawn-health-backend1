@@ -147,45 +147,65 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
      */
     @Override
     public CommunityPostsVO getCommunityPostsById(Long postId, Integer isPublic) {
-        // 参数校验
-        ThrowUtils.throwIf(postId == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
-        ThrowUtils.throwIf(!postBloomFilterManager.mightContain(postId), ErrorCode.COMMUNITY_POST_NOT_FOUND);
+        // 1. 参数校验
+        ThrowUtils.throwIf(postId == null, ErrorCode.PARAMS_ERROR, "帖子ID不能为空");
+        ThrowUtils.throwIf(isPublic == null || (isPublic != 0 && isPublic != 1),
+                ErrorCode.PARAMS_ERROR, "isPublic 必须为 0 或 1");
 
-        int publicFlag = (isPublic != null && (isPublic == 0 || isPublic == 1)) ? isPublic : 1;
-        //String redisKey = CommunityPostsConstant.POST_DETAIL_KEY_PREFIX + postId + ":" + (publicFlag == 1 ? "public" : "private");
-
-        // 使用CacheManager获取缓存（自动记录热点）
+        // 2. 构造缓存键（区分公开/私密）
+        String cacheKey = postId + ":" + (isPublic == 1 ? "public" : "private");
         CommunityPostsVO cachedVO = (CommunityPostsVO) cacheManager.get(
                 CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
-                postId.toString()
+                cacheKey
         );
-
         if (cachedVO != null) {
             return cachedVO;
         }
 
-        // 缓存未命中，查询数据库
+        // 3. 先尝试严格匹配查询
         QueryWrapper<CommunityPosts> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("id", postId);
-        queryWrapper.eq("is_public", publicFlag);
-
+        queryWrapper.eq("id", postId)
+                .eq("is_public", isPublic);
         CommunityPosts post = communityPostsMapper.selectOne(queryWrapper);
-        ThrowUtils.throwIf(post == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
-        Long userId = post.getUserId();
-        User user = userMapper.selectById(userId);
+
+        // 4. 如果严格匹配查询失败，尝试只按ID查询（用于状态切换场景）
+        if (post == null) {
+            QueryWrapper<CommunityPosts> fallbackQuery = new QueryWrapper<>();
+            fallbackQuery.eq("id", postId);
+            post = communityPostsMapper.selectOne(fallbackQuery);
+
+            if (post == null) {
+                throw new BusinessException(ErrorCode.COMMUNITY_POST_NOT_FOUND);
+            }
+
+            // 如果查询到的帖子状态与期望的不一致，说明是状态切换场景
+            if (post.getIsPublic() != isPublic) {
+                // 清理所有相关缓存
+                String publicCacheKey = postId + ":public";
+                String privateCacheKey = postId + ":private";
+                cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, publicCacheKey);
+                cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, privateCacheKey);
+            }
+        }
+
+        // 5. 更新布隆过滤器
+        postBloomFilterManager.add(postId);
+
+        // 6. 组装 VO
+        User user = userMapper.selectById(post.getUserId());
         CommunityPostsVO postVO = new CommunityPostsVO();
         BeanCopyUtils.copy(post, postVO);
         postVO.setAvatar(user.getAvatar());
         postVO.setNickname(user.getNickname());
         postVO.setPostTypeDesc(getPostTypeDescription(post.getPostType()));
-        postVO.setIsPublic(post.getIsPublic());
 
-        // 使用 put 方法写入缓存（同时更新本地和 Redis）
+        // 7. 写入缓存（使用实际的 isPublic 值）
+        String actualCacheKey = postId + ":" + (post.getIsPublic() == 1 ? "public" : "private");
         cacheManager.put(
                 CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
-                postId.toString(),
+                actualCacheKey,
                 postVO,
-                60 * 60  // 设置超时时间（秒），例如1小时
+                60 * 60  // 缓存1小时
         );
 
         return postVO;
@@ -277,6 +297,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
      */
     @Override
     public List<CommunityPostsVO> listPostsByUserId(Long userId, Integer isPublic) {
+        log.info("查询用户帖子参数 - userId: {}, isPublic: {}", userId, isPublic); // 添加这行
         // 参数校验
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID无效");
 
@@ -296,7 +317,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
 
         // 查询帖子列表
         List<CommunityPosts> posts = this.list(queryWrapper);
-
+        log.info("实际查询到的帖子数量: {}", posts.size()); // 添加这行
         // 转换为VO对象
         return posts.stream().map(post -> {
             CommunityPostsVO vo = new CommunityPostsVO();
@@ -311,6 +332,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
 
             return vo;
         }).collect(Collectors.toList());
+
     }
 
     /**
@@ -665,21 +687,25 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         CommunityPosts originalPost = communityPostsMapper.selectById(updatedPost.getId());
         ThrowUtils.throwIf(originalPost == null, ErrorCode.COMMUNITY_POST_NOT_FOUND);
 
+        // 保存原始的 isPublic 值，用于清理旧缓存
+        Integer originalIsPublic = originalPost.getIsPublic();
+
         updatedPost.setUpdateTime(new Date());
         int rows = communityPostsMapper.updateById(updatedPost);
 
         if (rows > 0) {
             Long postId = updatedPost.getId();
-            Integer isPublic = updatedPost.getIsPublic();
+            Integer newIsPublic = updatedPost.getIsPublic();
 
-            // ✅ 使用 CacheManager 删除旧缓存（键格式为 hashKey:key，如 post:123）
-            cacheManager.delete(
-                    CommunityPostsConstant.POST_DETAIL_KEY_PREFIX,
-                    postId.toString()
-            );
+            // 清理所有相关的缓存（包括公开和私密的缓存）
+            String publicCacheKey = postId + ":public";
+            String privateCacheKey = postId + ":private";
 
-            // 重新查询并返回最新视图（触发缓存重新写入）
-            return getCommunityPostsById(postId, isPublic);
+            cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, publicCacheKey);
+            cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, privateCacheKey);
+
+            // 重新查询并返回最新视图（使用新的 isPublic 值）
+            return getCommunityPostsById(postId, newIsPublic);
         } else {
             throw new BusinessException(ErrorCode.UPDATE_POST_ERROR);
         }

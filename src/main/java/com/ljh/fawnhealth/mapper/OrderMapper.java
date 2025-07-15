@@ -1,0 +1,26 @@
+package com.ljh.fawnhealth.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.ljh.fawnhealth.model.entity.Order;
+import org.apache.ibatis.annotations.Param;
+
+
+/**
+* @author 27105
+* @description 针对表【order(订单表)】的数据库操作Mapper
+* @createDate 2025-07-14 23:00:39
+* @Entity com.ljh.domain.Order
+*/
+public interface OrderMapper extends BaseMapper<Order> {
+
+    /**
+     * 统计商品关联的订单数量
+     * @param productId 商品ID
+     * @return 关联订单数量
+     */
+    int countByProductId(@Param("productId") Long productId);
+}
+
+
+
+

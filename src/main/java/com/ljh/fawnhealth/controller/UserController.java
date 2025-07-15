@@ -9,6 +9,7 @@ import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.WeightDTO;
 import com.ljh.fawnhealth.model.entity.User;
+import com.ljh.fawnhealth.model.vo.user.UserInfoVO;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
 import com.ljh.fawnhealth.service.EmailService;
 import com.ljh.fawnhealth.service.UserService;
@@ -16,6 +17,7 @@ import com.ljh.fawnhealth.utils.CharUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
@@ -182,6 +184,31 @@ public class UserController {
         User updatedUser = userService.updateUserInfo(userId, userUpdateDTO);
         return ResultUtils.success(updatedUser);
 
+    }
+
+    /**
+     * 根据用户ID查询用户信息
+     * @param userId 用户ID
+     * @return 用户信息（脱敏处理）
+     */
+    @GetMapping("/info/{userId}")
+    public BaseResponse<UserInfoVO> getUserInfoById(@PathVariable Long userId) {
+        // 参数校验
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID无效");
+        }
+
+        // 查询用户信息
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOTFOUND);
+        }
+
+        // 转换为 UserInfoVO（仅暴露需要的字段）
+        UserInfoVO userInfoVO = new UserInfoVO();
+        BeanUtils.copyProperties(user, userInfoVO); // 自动匹配同名字段
+
+        return ResultUtils.success(userInfoVO);
     }
 
 }
