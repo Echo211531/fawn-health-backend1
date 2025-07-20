@@ -506,3 +506,7 @@ CREATE TABLE `refund_application` (
                                       KEY `idx_user` (`user_id`),
                                       KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退款申请表';
+
+ALTER TABLE `order`
+    ADD COLUMN `address_id` bigint COMMENT '收货地址ID（关联shipping_address表的id）'
+        AFTER `coupon_id`;

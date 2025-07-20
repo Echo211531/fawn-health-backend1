@@ -2,6 +2,7 @@ package com.ljh.fawnhealth.controller;
 
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
+import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.model.dto.food.FoodAddDTO;
 import com.ljh.fawnhealth.model.dto.food.FoodCategoryAddDTO;
 import com.ljh.fawnhealth.model.dto.food.FoodCategoryUpdateDTO;
@@ -158,6 +159,18 @@ public class FoodLibraryController {
         log.info("获取常见食物列表，分类ID: {}", categoryId);
         List<FoodLibraryVO> commonFoods = foodLibraryService.getCommonFoods(categoryId);
         return ResultUtils.success(commonFoods);
+    }
+
+    /**
+     * 根据食物名称模糊搜索（不分页，返回所有匹配结果）
+     * @param keyword 食物名称关键词（前端只需传这个参数）
+     * @return 匹配的食物列表
+     */
+    @GetMapping("/searchByName")
+    public BaseResponse<List<FoodLibraryVO>> searchFoodByName(@RequestParam String keyword) {
+        log.info("模糊搜索食物，关键词：{}", keyword);
+        List<FoodLibraryVO> foodList = foodLibraryService.searchFoodByName(keyword.trim());
+        return ResultUtils.success(foodList);
     }
 
 

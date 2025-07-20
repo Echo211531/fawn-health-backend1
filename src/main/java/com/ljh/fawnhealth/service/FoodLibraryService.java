@@ -55,4 +55,11 @@ public interface FoodLibraryService extends IService<FoodLibrary> {
      * @return 常见食物信息列表
      */
     List<FoodLibraryVO> getCommonFoods(Long categoryId);
+
+    /**
+     * 根据食物名称模糊搜索（不分页，返回所有匹配结果）
+     * @param keyword 食物名称关键词（前端只需传这个参数）
+     * @return 匹配的食物列表
+     */
+    List<FoodLibraryVO> searchFoodByName(String keyword);
 }

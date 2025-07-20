@@ -1,7 +1,7 @@
 package com.ljh.fawnhealth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.ljh.fawnhealth.model.entity.ShippingAddress;
+import com.ljh.fawnhealth.model.entity.Address;
 
 
 /**
@@ -10,7 +10,7 @@ import com.ljh.fawnhealth.model.entity.ShippingAddress;
 * @createDate 2025-07-14 23:00:21
 * @Entity com.ljh.domain.ShippingAddress
 */
-public interface ShippingAddressMapper extends BaseMapper<ShippingAddress> {
+public interface AddressMapper extends BaseMapper<Address> {
 
 }
 

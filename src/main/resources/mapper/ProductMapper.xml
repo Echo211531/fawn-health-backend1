@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.ProductMapper">
+
+    <select id="selectByProductName" resultType="java.lang.Boolean">
+        SELECT CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END
+        FROM product
+        WHERE name = #{name}
+          AND is_delete = 0
+    </select>
+    <select id="selectByIdAndNotDelete" resultType="com.ljh.fawnhealth.model.entity.Product">
+        SELECT * FROM product WHERE id = #{id} AND is_delete = 0
+    </select>
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Product">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="name" column="name" jdbcType="VARCHAR"/>
+            <result property="categoryId" column="category_id" jdbcType="BIGINT"/>
+            <result property="description" column="description" jdbcType="VARCHAR"/>
+            <result property="price" column="price" jdbcType="DECIMAL"/>
+            <result property="originalPrice" column="original_price" jdbcType="DECIMAL"/>
+            <result property="stock" column="stock" jdbcType="INTEGER"/>
+            <result property="sales" column="sales" jdbcType="INTEGER"/>
+            <result property="mainImage" column="main_image" jdbcType="VARCHAR"/>
+            <result property="subImages" column="sub_images" jdbcType="VARCHAR"/>
+            <result property="detail" column="detail" jdbcType="VARCHAR"/>
+            <result property="specs" column="specs" jdbcType="VARCHAR"/>
+            <result property="status" column="status" jdbcType="TINYINT"/>
+            <result property="weight" column="weight" jdbcType="DECIMAL"/>
+            <result property="isHot" column="is_hot" jdbcType="TINYINT"/>
+            <result property="isRecommend" column="is_recommend" jdbcType="TINYINT"/>
+            <result property="sortOrder" column="sort_order" jdbcType="INTEGER"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,name,category_id,
+        description,price,original_price,
+        stock,sales,main_image,
+        sub_images,detail,specs,
+        status,weight,is_hot,
+        is_recommend,sort_order,create_time,
+        update_time,is_delete
+    </sql>
+
+</mapper>

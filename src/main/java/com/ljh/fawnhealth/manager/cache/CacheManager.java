@@ -80,6 +80,9 @@ public class CacheManager {
     public Object get(String hashKey, String key) {
         String compositeKey = buildCacheKey(hashKey, key);
 
+        hotKeyDetector.add(key, 1);
+        log.info("访问计数+1，key: {}", key);
+
         // 1. 优先查询本地缓存
         Object value = localCache.getIfPresent(compositeKey);
         if (value != null) {

@@ -30,4 +30,14 @@ public class DietFoodItemDTO {
      * 用户备注（可选）
      */
     private String note;
+
+    /**
+     * 食物名称
+     */
+    private String foodName;
+
+    /**
+     * 食物图片
+     */
+    private String foodImage;
 }

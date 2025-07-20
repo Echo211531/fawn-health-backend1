@@ -218,18 +218,40 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
      */
     @Override
     public List<CommunityPostsVO> getHotPosts(int topN) {
-        List<String> hotPostIds = cacheManager.getHotKeys(topN);
-        if (hotPostIds.isEmpty()) {
+        List<String> hotKeys = cacheManager.getHotKeys(topN); // 热点键格式为 "postId:public" 或 "postId:private"
+        if (hotKeys.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 批量查询数据库
-        List<Long> postIds = hotPostIds.stream()
-                .map(Long::parseLong)
+        // 核心修复：从热点键中提取纯帖子ID（分割冒号，取前半部分）
+        List<Long> postIds = hotKeys.stream()
+                .map(key -> {
+                    // 分割键（例如 "123:private" → ["123", "private"]）
+                    String[] parts = key.split(":", 2); // 最多分割成两部分
+                    if (parts.length == 0) {
+                        log.warn("无效的热点键格式（空）: {}", key);
+                        return null;
+                    }
+                    // 取分割后的第一部分（纯数字ID）
+                    String idStr = parts[0].trim();
+                    try {
+                        return Long.parseLong(idStr); // 转换为数字ID
+                    } catch (NumberFormatException e) {
+                        log.warn("热点键无法转换为数字ID: {}", key, e);
+                        return null; // 过滤无效ID
+                    }
+                })
+                .filter(Objects::nonNull) // 移除转换失败的null值
                 .collect(Collectors.toList());
+
+        if (postIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 批量查询数据库（保持原逻辑）
         List<CommunityPosts> posts = communityPostsMapper.selectBatchIds(postIds);
 
-        // 使用 LinkedHashMap 保持顺序
+        // 使用LinkedHashMap保持热度排序
         Map<Long, CommunityPosts> postMap = posts.stream()
                 .collect(Collectors.toMap(
                         CommunityPosts::getId,
@@ -238,9 +260,8 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
                         LinkedHashMap::new
                 ));
 
-        // 按热度排序并转换为 VO
-        return hotPostIds.stream()
-                .map(Long::parseLong)
+        // 按热点顺序转换为VO
+        return postIds.stream()
                 .map(postMap::get)
                 .filter(Objects::nonNull)
                 .map(this::convertToVO)

@@ -191,4 +191,25 @@ public class FoodLibraryServiceImpl extends ServiceImpl<FoodLibraryMapper, FoodL
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 根据食物名称模糊搜索（不分页，返回所有匹配结果）
+     *
+     * @param keyword 食物名称关键词（前端只需传这个参数）
+     * @return 匹配的食物列表
+     */
+    @Override
+    public List<FoodLibraryVO> searchFoodByName(String keyword) {
+        // 构建查询条件：模糊匹配名称 + 未删除
+        QueryWrapper<FoodLibrary> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("name", keyword)  // 模糊搜索
+                .eq("is_delete", 0)      // 过滤已删除的食物
+                .orderByAsc("name");     // 按名称升序排序（可选）
+
+        // 查询所有匹配结果
+        List<FoodLibrary> foodList = this.list(queryWrapper);
+
+        // 转换为VO返回
+        return BeanCopyUtils.copyList(foodList, FoodLibraryVO.class);
+    }
+
 }

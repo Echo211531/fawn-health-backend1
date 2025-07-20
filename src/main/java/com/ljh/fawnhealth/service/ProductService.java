@@ -64,4 +64,29 @@ public interface ProductService extends IService<Product> {
      * @return 商品VO列表
      */
     List<ProductVO> getProductListByParams(String name, Integer status, Integer isHot, Integer isRecommend);
+
+    /**
+     * 根据商品ID查询商品详细信息
+     *
+     * @param productId 商品ID
+     * @return 商品详细信息（ProductVO）
+     */
+    ProductVO getProductById(Long productId);
+
+    /**
+     * 查询推荐商品列表
+     * 只查询状态为上架（status=1）且标记为推荐（is_recommend=1）的商品
+     *
+     * @return 推荐商品列表
+     */
+    List<ProductVO> getRecommendProducts();
+
+    /**
+     * 根据商品名称模糊查询商品分类信息
+     * 只查询状态为上架（status=1）且未删除（is_delete=0）的商品
+     *
+     * @param name 商品名称（模糊匹配）
+     * @return 符合条件的商品分类信息列表
+     */
+    List<ProductVO> searchProductsByCategory(String name);
 }

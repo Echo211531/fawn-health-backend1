@@ -15,7 +15,7 @@ import java.util.Date;
  */
 @TableName(value ="shipping_address")
 @Data
-public class ShippingAddress implements Serializable {
+public class Address implements Serializable {
     /**
      * 地址ID
      */

@@ -116,4 +116,47 @@ public class ProductController {
 
         return ResultUtils.success(productList);
     }
+
+    /**
+     * 根据商品ID查询商品详细信息
+     *
+     * @param productId 商品ID
+     * @return 商品详细信息（ProductVO）
+     */
+    @GetMapping("/detail/{productId}")
+    public BaseResponse<ProductVO> getProductDetail(@PathVariable Long productId) {
+        ProductVO productVO = productService.getProductById(productId);
+        return ResultUtils.success(productVO);
+    }
+
+    /**
+     * 查询推荐商品列表
+     * 只查询状态为上架（status=1）且标记为推荐（is_recommend=1）的商品
+     *
+     * @return 推荐商品列表
+     */
+    @GetMapping("/recommend")
+    public BaseResponse<List<ProductVO>> getRecommendProducts() {
+        // 查询状态为上架且标记为推荐的商品
+        List<ProductVO> recommendProducts = productService.getRecommendProducts();
+        return ResultUtils.success(recommendProducts);
+    }
+
+    /**
+     * 根据商品名称模糊查询商品分类信息
+     * 只查询状态为上架（status=1）且未删除（is_delete=0）的商品
+     *
+     * @param name 商品名称（模糊匹配）
+     * @return 符合条件的商品分类信息列表
+     */
+    @GetMapping("/category/search")
+    public BaseResponse<List<ProductVO>> searchProductCategoriesByName(@RequestParam String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品名称不能为空");
+        }
+
+        List<ProductVO> productVOs = productService.searchProductsByCategory(name.trim());
+        return ResultUtils.success(productVOs);
+    }
+
 }

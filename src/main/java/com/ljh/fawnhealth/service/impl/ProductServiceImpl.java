@@ -341,6 +341,109 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
     }
 
     /**
+     * 根据商品ID查询商品详细信息
+     *
+     * @param productId 商品ID
+     * @return 商品详细信息（ProductVO）
+     */
+    @Override
+    public ProductVO getProductById(Long productId) {
+
+        // 参数校验
+        if (productId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品ID不能为空");
+        }
+
+        // 查询商品实体（只查询未删除的商品）
+        Product product = productMapper.selectOne(
+                new QueryWrapper<Product>()
+                        .eq("id", productId)
+                        .eq("is_delete", 0)
+        );
+
+        if (product == null) {
+            return null; // 商品不存在或已删除
+        }
+
+        // 转换为VO并返回（补充完整信息）
+        ProductVO productVO = new ProductVO();
+        BeanUtils.copyProperties(product, productVO);
+
+//        // 可选：补充关联信息（如分类名称，需关联查询分类表）
+//        if (product.getCategoryId() != null) {
+//            ProductCategory category = productCategoryMapper.selectById(product.getCategoryId());
+//            if (category != null) {
+//                productVO.setCategoryName(category.getName()); // 假设ProductVO中有categoryName字段
+//            }
+//        }
+
+        return productVO;
+    }
+
+    /**
+     * 查询推荐商品列表
+     * 只查询状态为上架（status=1）且标记为推荐（is_recommend=1）的商品
+     *
+     * @return 推荐商品列表
+     */
+    /**
+     * 获取推荐商品列表
+     * 只查询状态为上架（status=1）且标记为推荐（is_recommend=1）的商品
+     * 按sort_order排序，权重高的排在前面
+     */
+    @Override
+    public List<ProductVO> getRecommendProducts() {
+        // 构建查询条件
+        QueryWrapper<Product> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("status", 1)  // 只查询上架商品
+                .eq("is_recommend", 1)  // 只查询推荐商品
+                .eq("is_delete", 0)  // 排除已删除商品
+                .orderByDesc("sort_order")  // 按排序权重降序排列
+                .last("limit 20");  // 限制最多返回10条推荐商品
+
+        List<Product> productList = productMapper.selectList(queryWrapper);
+
+        // 转换为VO并返回
+        return productList.stream()
+                .map(product -> {
+                    ProductVO productVO = new ProductVO();
+                    BeanUtils.copyProperties(product, productVO);
+                    return productVO;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据商品名称模糊查询商品分类信息
+     * 只查询状态为上架（status=1）且未删除（is_delete=0）的商品
+     *
+     * @param name 商品名称（模糊匹配）
+     * @return 符合条件的商品分类信息列表
+     */
+    @Override
+    public List<ProductVO> searchProductsByCategory(String name) {
+        QueryWrapper<Product> queryWrapper = new QueryWrapper<>();
+        // 模糊匹配商品名称
+        queryWrapper.like("name", name)
+                // 只查询上架商品
+                .eq("status", 1)
+                // 排除已删除商品
+                .eq("is_delete", 0)
+                // 按分类排序
+                .orderByAsc("category_id");
+
+        List<Product> products = productMapper.selectList(queryWrapper);
+
+        return products.stream()
+                .map(product -> {
+                    ProductVO productVO = new ProductVO();
+                    BeanUtils.copyProperties(product, productVO);
+                    return productVO;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 校验状态转换的业务规则
      */
     private void validateStatusTransition(Integer currentStatus, Integer newStatus, Integer stock) {

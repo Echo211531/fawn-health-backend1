@@ -3,6 +3,7 @@ package com.ljh.fawnhealth.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ljh.fawnhealth.model.entity.Order;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 
 /**
@@ -19,6 +20,9 @@ public interface OrderMapper extends BaseMapper<Order> {
      * @return 关联订单数量
      */
     int countByProductId(@Param("productId") Long productId);
+
+    @Select("SELECT * FROM `order` WHERE order_no = #{orderNo}")
+    Order selectByOrderNo(String orderNo);
 }
 
 

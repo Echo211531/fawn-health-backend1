@@ -192,7 +192,9 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
     public List<DietRecordSimpleVO> getHistoryRecords(Long userId, Integer days) {
         QueryWrapper<DietRecords> wrapper = new QueryWrapper<>();
         wrapper.eq("user_id", userId)
-                .eq("is_delete", 0);
+                .eq("is_delete", 0)
+                .orderByDesc("record_date")
+                .orderByDesc("create_time");
 
         // 若指定天数，筛选最近days天内的记录
         if (days != null) {
@@ -203,6 +205,7 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
 
         List<DietRecords> records = dietRecordsMapper.selectList(wrapper);
         List<DietRecordSimpleVO> result = new ArrayList<>();
+
         for (DietRecords record : records) {
             DietRecordSimpleVO vo = new DietRecordSimpleVO();
             BeanUtils.copyProperties(record, vo);
@@ -211,13 +214,30 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
             List<DietFoodItemDTO> foodDTOs = foodItems.stream().map(item -> {
                 DietFoodItemDTO dto = new DietFoodItemDTO();
                 BeanUtils.copyProperties(item, dto);
+
+                // 关键修改：查询食物库获取名称和图片
+                if (item.getFoodId() != null) {
+                    FoodLibrary food = foodLibraryMapper.selectById(item.getFoodId());
+                    if (food != null) {
+                        // 设置食物名称（注意：原DTO中foodName是Long类型，需要先修改为String）
+                        dto.setFoodName(food.getName());
+                        dto.setFoodImage(food.getImage());
+                    }
+                } else {
+                    // 处理手动添加的食物（没有foodId的情况）
+                    dto.setFoodName(item.getFoodName()); // 直接使用item中的食物名称
+                    dto.setFoodImage(null); // 手动添加的食物可能没有图片
+                }
+
                 return dto;
             }).collect(Collectors.toList());
+
             vo.setFoodItems(foodDTOs);
             result.add(vo);
         }
         return result;
     }
+
 
     /**
      * 根据饮食记录ID查询详细信息，包括食物项列表

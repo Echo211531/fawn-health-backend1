@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.OrderMapper">
+
+    <select id="countByProductId" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM order_item
+        WHERE product_id = #{productId}
+          AND is_delete = 0
+    </select>
+
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Order">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <id property="addressId" column="address_id" jdbcType="BIGINT"/>
+            <result property="orderNo" column="order_no" jdbcType="VARCHAR"/>
+            <result property="userId" column="user_id" jdbcType="BIGINT"/>
+            <result property="totalAmount" column="total_amount" jdbcType="DECIMAL"/>
+            <result property="paymentAmount" column="payment_amount" jdbcType="DECIMAL"/>
+            <result property="freightAmount" column="freight_amount" jdbcType="DECIMAL"/>
+            <result property="discountAmount" column="discount_amount" jdbcType="DECIMAL"/>
+            <result property="couponAmount" column="coupon_amount" jdbcType="DECIMAL"/>
+            <result property="paymentType" column="payment_type" jdbcType="TINYINT"/>
+            <result property="paymentTime" column="payment_time" jdbcType="TIMESTAMP"/>
+            <result property="paymentSerialNumber" column="payment_serial_number" jdbcType="VARCHAR"/>
+            <result property="status" column="status" jdbcType="TINYINT"/>
+            <result property="deliveryCompany" column="delivery_company" jdbcType="VARCHAR"/>
+            <result property="deliveryNo" column="delivery_no" jdbcType="VARCHAR"/>
+            <result property="deliveryTime" column="delivery_time" jdbcType="TIMESTAMP"/>
+            <result property="receiveTime" column="receive_time" jdbcType="TIMESTAMP"/>
+            <result property="note" column="note" jdbcType="VARCHAR"/>
+            <result property="source" column="source" jdbcType="TINYINT"/>
+            <result property="confirmStatus" column="confirm_status" jdbcType="TINYINT"/>
+            <result property="deleteStatus" column="delete_status" jdbcType="TINYINT"/>
+            <result property="couponId" column="coupon_id" jdbcType="BIGINT"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,order_no,user_id,
+        total_amount,payment_amount,freight_amount,
+        discount_amount,coupon_amount,payment_type,
+        payment_time,payment_serial_number,status,
+        delivery_company,delivery_no,delivery_time,
+        receive_time,note,source,addressId
+        confirm_status,delete_status,coupon_id,
+        create_time,update_time,is_delete
+    </sql>
+</mapper>

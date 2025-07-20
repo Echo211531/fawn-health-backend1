@@ -14,7 +14,7 @@ import java.util.Date;
  * 订单表
  * @TableName order
  */
-@TableName(value ="order")
+@TableName(value ="`order`")
 @Data
 public class Order implements Serializable {
     /**
@@ -122,6 +122,11 @@ public class Order implements Serializable {
      * 使用的优惠券ID
      */
     private Long couponId;
+
+    /**
+     * 收货地址ID
+     */
+    private Long addressId;
 
     /**
      * 创建时间
