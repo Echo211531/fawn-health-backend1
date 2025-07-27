@@ -10,7 +10,9 @@ import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.WeightDTO;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.vo.user.UserInfoVO;
+import com.ljh.fawnhealth.model.vo.user.UserLoginStatisticsVO;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
+import com.ljh.fawnhealth.model.vo.user.UserNewStatisticsVO;
 import com.ljh.fawnhealth.service.EmailService;
 import com.ljh.fawnhealth.service.UserService;
 import com.ljh.fawnhealth.utils.CharUtil;
@@ -22,9 +24,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.concurrent.TimeUnit;
-
-import static com.ljh.fawnhealth.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
  * 用户模块
@@ -95,6 +99,20 @@ public class UserController {
     }
 
     /**
+     * 管理员登录
+     *
+     * @param username
+     * @param password
+     * @return
+     */
+    @PostMapping("/loginAdmin")
+    public BaseResponse<UserLoginVO> loginWithUserNameAdmin(String username, String password) {
+        UserLoginVO userLoginVO = userService.findAdminByEmail(username,password);
+        log.info("userLoginVO:{}", userLoginVO);
+        return ResultUtils.success(userLoginVO);
+    }
+
+    /**
      * 退出登录
      *
      * @return 退出成功
@@ -147,7 +165,12 @@ public class UserController {
         return ip;
     }
 
-    //获取当前用户信息
+    /**
+     * 获取当前用户信息
+     *
+     * @param request
+     * @return
+     */
     @GetMapping("/get/login")
     public BaseResponse<User> getLoginUser(HttpServletRequest request) {
         User user = userService.getLoginUser(request);
@@ -157,6 +180,7 @@ public class UserController {
     /**
      * 修改用户信息接口
      * 支持部分字段更新（昵称、头像、生日、身高、体重、目标体重）
+     *
      * @param userUpdateDTO
      * @param request
      * @return
@@ -188,6 +212,7 @@ public class UserController {
 
     /**
      * 根据用户ID查询用户信息
+     *
      * @param userId 用户ID
      * @return 用户信息（脱敏处理）
      */
@@ -209,6 +234,30 @@ public class UserController {
         BeanUtils.copyProperties(user, userInfoVO); // 自动匹配同名字段
 
         return ResultUtils.success(userInfoVO);
+    }
+
+    /**
+     * 用户新增数据统计
+     * 获取今日、昨日、本月新增用户数及日环比增长率
+     *
+     * @return 统计结果VO
+     */
+    @GetMapping("/statisticsNewUsers")
+    public BaseResponse<UserNewStatisticsVO> getNewUsersStatistics() {
+        UserNewStatisticsVO newUsersStatistics = userService.getNewUsersStatistics();
+        return ResultUtils.success(newUsersStatistics);
+    }
+
+    /**
+     * 用户登录数据统计
+     * 获取今日、昨日登录用户数及日环比增长率
+     *
+     * @return 统计结果VO
+     */
+    @GetMapping("/statisticsLogin")
+    public BaseResponse<UserLoginStatisticsVO> getLoginStatistics() {
+        UserLoginStatisticsVO statisticsVO = userService.getLoginStatistics();
+        return ResultUtils.success(statisticsVO);
     }
 
 }

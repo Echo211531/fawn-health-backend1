@@ -18,6 +18,16 @@ public class OrderVO {
     private Long id;
 
     /**
+     * 用户ID
+     */
+    private Long userId;
+
+    /**
+     * 订单来源：1-PC，2-APP，3-小程序，4-H5
+     */
+    private Integer source;
+
+    /**
      * 订单编号
      */
     private String orderNo;

@@ -78,10 +78,10 @@ public class ProhibitedWordAdvisor implements CallAroundAdvisor, StreamAroundAdv
      */
     private AdvisedRequest checkRequest(AdvisedRequest request) {
         String userText = request.userText();
-        if (containsProhibitedWord(userText)) {
-            log.warn("检测到违禁词在用户输入中: {}", userText);
-            throw new ProhibitedWordException("用户输入包含违禁词");
-        }
+//        if (containsProhibitedWord(userText)) {
+//            log.warn("检测到违禁词在用户输入中: {}", userText);
+//            throw new ProhibitedWordException("用户输入包含违禁词");
+//        }
         return request;
     }
 

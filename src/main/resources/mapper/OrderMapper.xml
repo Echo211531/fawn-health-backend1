@@ -11,6 +11,19 @@
           AND is_delete = 0
     </select>
 
+    <select id="sumOrderAmount" resultType="java.math.BigDecimal">
+        SELECT IFNULL(SUM(total_amount), 0)
+        FROM `order`
+        WHERE is_delete = 0
+          AND create_time BETWEEN #{startTime} AND #{endTime}
+    </select>
+
+    <select id="sumTotalAmount" resultType="java.math.BigDecimal">
+        SELECT IFNULL(SUM(total_amount), 0)
+        FROM `order`
+                 ${ew.customSqlSegment}
+    </select>
+
 
     <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Order">
             <id property="id" column="id" jdbcType="BIGINT"/>

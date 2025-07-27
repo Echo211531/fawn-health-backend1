@@ -6,6 +6,7 @@
 
     <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.User">
             <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="userName" column="user_name" jdbcType="VARCHAR"/>
             <result property="email" column="email" jdbcType="VARCHAR"/>
             <result property="emailVerified" column="email_verified" jdbcType="TINYINT"/>
             <result property="password" column="password" jdbcType="VARCHAR"/>
@@ -31,7 +32,7 @@
 
     <sql id="Base_Column_List">
         id,email,email_verified,
-        password,avatar,nickname,
+        password,avatar,nickname,userName
         gender,birthday,height,role,dailyCalories
         weight,target_weight,bmi,
         is_vip,vip_expire_time,vip_level,
