@@ -11,7 +11,6 @@ import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import jakarta.annotation.Resource;
-import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;

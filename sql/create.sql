@@ -1,6 +1,7 @@
 CREATE TABLE `user` (
                         `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
                         `email` varchar(100) NOT NULL COMMENT '邮箱',
+                        `username` varchar(50) NULL COMMENT '管理员登录账号',
                         `email_verified` tinyint(1) NOT NULL DEFAULT '0' COMMENT '邮箱验证状态',
                         `password` varchar(255) DEFAULT NULL COMMENT '密码(加密存储，可选)',
                         `avatar` varchar(255) DEFAULT NULL COMMENT '头像URL',

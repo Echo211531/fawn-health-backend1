@@ -31,6 +31,11 @@ public class User implements Serializable {
     private String email;
 
     /**
+     * 管理员登录账号
+     */
+    private String userName;
+
+    /**
      * 邮箱验证状态
      */
     private Integer emailVerified;

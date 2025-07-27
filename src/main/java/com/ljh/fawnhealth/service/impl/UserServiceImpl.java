@@ -11,19 +11,27 @@ import com.ljh.fawnhealth.mapper.UserMapper;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.enums.user.UserRole;
+import com.ljh.fawnhealth.model.vo.user.UserLoginStatisticsVO;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
+import com.ljh.fawnhealth.model.vo.user.UserNewStatisticsVO;
 import com.ljh.fawnhealth.service.UserService;
 import com.ljh.fawnhealth.utils.JwtUtil;
+import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -55,6 +63,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     /**
      * 邮箱验证码登录
+     *
      * @param email
      * @param loginIp
      * @return
@@ -64,6 +73,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(User::getEmail, email);
         User user = userMapper.selectOne(queryWrapper);
+
 
         if (user == null) {
             user = new User();
@@ -76,6 +86,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             user.setRole(UserRole.USER.getDescription());
             user.setAvatar("http://fawn-health.oss-cn-chengdu.aliyuncs.com/fawn-health-userAvatar.png");
             user.setCreateTime(new Date());
+        }
+
+        if(user.getStatus() == 0){
+            throw  new BusinessException(ErrorCode.PARAMS_ERROR, "账号被封禁，请联系管理员");
         }
 
         // 每次登录都更新以下字段
@@ -109,6 +123,79 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return vo;
     }
 
+    /**
+     * 管理员登录
+     *
+     * @param username
+     * @param password
+     * @return
+     */
+    @Override
+    public UserLoginVO findAdminByEmail(String username, String password) {
+        // 参数校验
+        if (StringUtils.isBlank(username) || StringUtils.isBlank(password)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户名或密码不能为空");
+        }
+
+        // 查询用户
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(User::getUserName, username)
+                .or()
+                .eq(User::getEmail, username); // 支持用户名或邮箱登录
+        User user = userMapper.selectOne(queryWrapper);
+
+        // 验证用户是否存在
+        if (user == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或密码错误");
+        }
+
+        // 验证是否为管理员角色
+        if (!"admin".equals(user.getRole()) && !"super_admin".equals(user.getRole())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "没有管理员权限，无法登录");
+        }
+
+        // 验证账号状态
+        if (user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号已被禁用，请联系超级管理员");
+        }
+
+        // 对前端传过来的明文密码进行md5加密
+        String encryptedPassword = DigestUtils.md5DigestAsHex(password.getBytes());
+
+        // 验证密码
+        if (!encryptedPassword.equals(user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        // 更新最后登录信息
+        User updateUser = new User();
+        updateUser.setId(user.getId());
+        updateUser.setLastLoginTime(new Date());
+        userMapper.updateById(updateUser);
+        // 生成 Token
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(JwtClaimsConstant.USER_ID, user.getId());
+        String token = JwtUtil.createJWT(
+                jwtProperties.getUserSecretKey(),
+                jwtProperties.getUserTtl(),
+                claims
+        );
+        UserLoginVO loginVO = new UserLoginVO();
+        BeanUtils.copyProperties(user, loginVO);
+        log.info("用户id是：{}",loginVO.getId());
+        loginVO.setToken(token);
+
+        return loginVO;
+    }
+
+    /**
+     * 更新用户体重和目标体重信息
+     *
+     * @param userId 用户ID
+     * @param weight 体重(kg)
+     * @param targetWeight 目标体重(kg)
+     * @return 更新是否成功
+     */
     @Override
     public void updateWeightInfo(Long userId, BigDecimal weight, BigDecimal targetWeight, Integer periodDays) {
         // 查询用户信息
@@ -158,7 +245,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
     }
 
-    /** 计算BMI指数 */
+    /**
+     * 计算BMI指数
+     *
+     * @param weight
+     * @param height
+     * @return
+     */
     private BigDecimal calculateBmi(BigDecimal weight, BigDecimal height) {
         if (weight == null || height == null || height.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
@@ -168,7 +261,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return weight.divide(heightSquared, 2, RoundingMode.HALF_UP);
     }
 
-    /** 计算基础代谢率 */
+    /**
+     * 计算基础代谢率
+     *
+     * @param userId
+     * @param weight
+     * @param height
+     * @param gender
+     * @param birthday
+     * @return
+     */
     private BigDecimal calculateBmr(Long userId,BigDecimal weight, BigDecimal height, Integer gender, Date birthday) {
         // 参数有效性校验
         if (weight == null || weight.compareTo(BigDecimal.ZERO) <= 0) {
@@ -206,12 +308,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return bmr.setScale(0, RoundingMode.HALF_UP);
     }
 
-    /** 获取默认基础代谢率 */
+    /**
+     * 获取默认基础代谢率
+     *
+     * @param gender
+     * @return
+     */
     private BigDecimal getDefaultBmr(Integer gender) {
         return gender == 1 ? new BigDecimal("1500") : new BigDecimal("1200");
     }
 
-    /** 计算年龄 */
+    /**
+     * 计算年龄
+     * @param birthday
+     * @return
+     */
     private int calculateAge(Date birthday) {
         Calendar birth = Calendar.getInstance();
         birth.setTime(birthday);
@@ -225,7 +336,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return age;
     }
 
-    /** 计算每日所需热量 */
+    /**
+     * 计算每日所需热量
+     *
+     * @param currentWeight
+     * @param targetWeight
+     * @param periodDays
+     * @param tdee
+     * @return
+     */
     private BigDecimal calculateDailyCalories(
             BigDecimal currentWeight,
             BigDecimal targetWeight,
@@ -257,6 +376,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     /**
      * 获取当前用户
+     *
      * @return
      */
     @Override
@@ -424,6 +544,116 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         List<User> users = userMapper.selectBatchIds(userIds);
         return users.stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
+    }
+
+    /**
+     * 实现用户新增数据统计逻辑
+     */
+    @Override
+    public UserNewStatisticsVO getNewUsersStatistics() {
+        // 获取当前时间（上海时区）
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
+
+        // 1. 今日新增用户
+        LocalDateTime todayStart = now.with(LocalTime.MIN);
+        LocalDateTime todayEnd = now;
+        long todayNewUsers = countNewUsers(todayStart, todayEnd);
+
+        // 2. 昨日新增用户
+        LocalDateTime yesterdayStart = todayStart.minusDays(1);
+        LocalDateTime yesterdayEnd = yesterdayStart.with(LocalTime.MAX);
+        long yesterdayNewUsers = countNewUsers(yesterdayStart, yesterdayEnd);
+
+        // 3. 本月新增用户
+        LocalDateTime monthStart = now.with(TemporalAdjusters.firstDayOfMonth()).with(LocalTime.MIN);
+        LocalDateTime monthEnd = now;
+        long monthNewUsers = countNewUsers(monthStart, monthEnd);
+
+        // 4. 计算日环比增长率
+        BigDecimal dayOnDayRate = calculateDayOnDayRate(todayNewUsers, yesterdayNewUsers);
+
+        // 封装结果
+        UserNewStatisticsVO statisticsVO = new UserNewStatisticsVO();
+        statisticsVO.setTodayNewUsers(todayNewUsers);
+        statisticsVO.setYesterdayNewUsers(yesterdayNewUsers);
+        statisticsVO.setMonthNewUsers(monthNewUsers);
+        statisticsVO.setDayOnDayRate(dayOnDayRate);
+        statisticsVO.setStatisticTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
+
+        return statisticsVO;
+    }
+
+    @Override
+    public UserLoginStatisticsVO getLoginStatistics() {
+        // 使用上海时区确保时间准确性
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
+
+        // 1. 今日登录用户数：今日00:00:00至当前时间
+        LocalDateTime todayStart = now.with(LocalTime.MIN);
+        LocalDateTime todayEnd = now;
+        long todayLoginUsers = countLoginUsers(todayStart, todayEnd);
+
+        // 2. 昨日登录用户数：昨日00:00:00至昨日23:59:59
+        LocalDateTime yesterdayStart = todayStart.minusDays(1);
+        LocalDateTime yesterdayEnd = yesterdayStart.with(LocalTime.MAX);
+        long yesterdayLoginUsers = countLoginUsers(yesterdayStart, yesterdayEnd);
+
+        // 3. 本月登录用户数：本月1日00:00:00至当前时间（新增逻辑）
+        LocalDateTime monthStart = now.with(TemporalAdjusters.firstDayOfMonth()).with(LocalTime.MIN);
+        LocalDateTime monthEnd = now;
+        long monthLoginUsers = countLoginUsers(monthStart, monthEnd);
+
+        // 4. 计算日环比增长率（今日较昨日）
+        BigDecimal dayOnDayRate = calculateDayOnDayRate(todayLoginUsers, yesterdayLoginUsers);
+
+        // 封装结果（包含新增的本月登录用户数）
+        UserLoginStatisticsVO statisticsVO = new UserLoginStatisticsVO();
+        statisticsVO.setTodayLoginUsers(todayLoginUsers);
+        statisticsVO.setYesterdayLoginUsers(yesterdayLoginUsers);
+        statisticsVO.setMonthLoginUsers(monthLoginUsers);  // 设置新增字段
+        statisticsVO.setDayOnDayRate(dayOnDayRate);
+        statisticsVO.setStatisticTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
+
+        return statisticsVO;
+    }
+
+    /**
+     * 统计指定时间段内的登录用户数
+     */
+    private long countLoginUsers(LocalDateTime startTime, LocalDateTime endTime) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        // 统计最后登录时间在指定时间段内的用户
+        queryWrapper.between(User::getLastLoginTime, startTime, endTime);
+        return baseMapper.selectCount(queryWrapper);
+    }
+
+    /**
+     * 统计指定时间段内的新增用户数
+     *
+     * @param startTime
+     * @param endTime
+     * @return
+     */
+    private long countNewUsers(LocalDateTime startTime, LocalDateTime endTime) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.between(User::getCreateTime, startTime, endTime);
+        return baseMapper.selectCount(queryWrapper);
+    }
+
+    /**
+     * 计算日环比增长率（今日较昨日）
+     *
+     * @param todayNewUsers
+     * @param yesterdayNewUsers
+     * @return
+     */
+    private BigDecimal calculateDayOnDayRate(long todayNewUsers, long yesterdayNewUsers) {
+        if (yesterdayNewUsers <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal(todayNewUsers - yesterdayNewUsers)
+                .divide(new BigDecimal(yesterdayNewUsers), 4, BigDecimal.ROUND_HALF_UP)
+                .multiply(new BigDecimal(100));
     }
 
 }

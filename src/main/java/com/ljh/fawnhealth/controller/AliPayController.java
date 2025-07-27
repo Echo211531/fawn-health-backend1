@@ -27,7 +27,7 @@ public class AliPayController {
     private OrderService orderService;
 
     @PostMapping("/pay")
-    public BaseResponse<String> alipay(@RequestParam Long orderId) throws AlipayApiException {
+    public BaseResponse<String> alipay(@RequestParam Long orderId, @RequestParam Integer paymentType) {
         // 获取订单信息
         Order order = orderService.getOrder(orderId);
         if (order == null) {
@@ -40,6 +40,7 @@ public class AliPayController {
         }
         Order updateOrder = new Order();
         updateOrder.setId(orderId);
+        updateOrder.setPaymentType(paymentType);
         updateOrder.setStatus(1); // 关键：手动设置目标状态为1（已支付待发货）
         orderService.updateOrderStatus(updateOrder);
         return ResultUtils.success("订单支付成功");

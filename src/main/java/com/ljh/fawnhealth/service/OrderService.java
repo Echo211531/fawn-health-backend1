@@ -1,10 +1,15 @@
 package com.ljh.fawnhealth.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.dto.order.OrderCreateDTO;
+import com.ljh.fawnhealth.model.dto.order.OrderPageQueryDTO;
+import com.ljh.fawnhealth.model.dto.order.OrderStatusUpdateDTO;
 import com.ljh.fawnhealth.model.entity.Order;
-import com.ljh.fawnhealth.model.vo.order.OrderVO;
+import com.ljh.fawnhealth.model.vo.order.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -50,4 +55,58 @@ public interface OrderService extends IService<Order> {
      * @return 订单详细信息（包含商品、地址等）
      */
     OrderVO getOrderDetailById(Long orderId);
+
+    /**
+     * 获取订单统计数据（今日、昨日订单数及日环比）
+     *
+     * @return 订单统计VO
+     */
+    OrderStatisticsVO getOrderStatistics();
+
+    /**
+     * 统计指定时间段内的订单数量
+     *
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 订单数量
+     */
+    long countOrdersByTimeRange(LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
+     * 获取订单金额统计数据（今日、昨日金额及日环比）
+     * @return 订单金额统计VO
+     */
+    OrderAmountStatisticsVO getOrderAmountStatistics();
+
+    /**
+     * 统计指定时间段内的订单总金额
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 订单总金额
+     */
+    BigDecimal sumOrderAmountByTimeRange(LocalDateTime startTime, LocalDateTime endTime);
+
+
+    OrderChartVO statisticOrder(String dimension);
+
+    /**
+     * 分页查询全部订单信息
+     * @param queryDTO 分页查询参数
+     * @return 分页订单VO列表
+     */
+    IPage<OrderVO> queryAllOrdersByPage(OrderPageQueryDTO queryDTO);
+
+    /**
+     * 根据订单ID查询订单项列表（包含商品信息）
+     * @param orderId 订单ID
+     * @return 订单项VO列表
+     */
+    List<OrderItemVO> getOrderItemsByOrderId(Long orderId);
+
+    /**
+     * 修改订单状态
+     * @param updateDTO 包含订单ID、目标状态等信息
+     * @return 修改后的订单信息
+     */
+    OrderVO updateOrderStatus(OrderStatusUpdateDTO updateDTO);
 }
