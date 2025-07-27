@@ -197,12 +197,8 @@ public class ToolCallAgent extends ReActAgent {
             String toolName = response.name();
             String responseData = response.responseData();
 
-            // 去重：如果相同工具的结果已存在，则追加而不是覆盖
-            if (uniqueResults.containsKey(toolName)) {
-                uniqueResults.put(toolName, uniqueResults.get(toolName) + "\n" + responseData);
-            } else {
-                uniqueResults.put(toolName, responseData);
-            }
+            // 去重：如果相同工具的结果已存在
+            uniqueResults.put(toolName, responseData);
         }
         // 构建工具响应字符串（格式化输出）
         StringBuilder resultsBuilder = new StringBuilder();
@@ -220,13 +216,26 @@ public class ToolCallAgent extends ReActAgent {
         }
         // 发送工具响应事件（新类型）
         sendStreamEvent(emitter, StreamEventType.TOOL_RESPONSE, results);
-        // +++ 将工具结果作为用户消息加入上下文 +++
-        if (StrUtil.isNotBlank(results)) {
+
+        // 检查是否已有相同工具的结果 // [!code focus:7]
+        boolean toolResultExists = false;
+        for (String toolName : uniqueResults.keySet()) {
+            toolResultExists = getMessageList().stream()
+                    .filter(msg -> msg instanceof UserMessage)
+                    .anyMatch(msg -> msg.getText() != null &&
+                            msg.getText().contains("工具 [" + toolName + "]"));
+            if (toolResultExists) {
+                break;
+            }
+        }
+
+        // 避免重复添加相同工具的结果
+        if (StrUtil.isNotBlank(results) && !toolResultExists) {
             getMessageList().add(new UserMessage(results));
         }
 
         // 生成精简总结
-        generateFinalSummary(emitter, results);
+        //generateFinalSummary(emitter, results);
 
 
         // 判断是否调用了终止工具
@@ -250,48 +259,48 @@ public class ToolCallAgent extends ReActAgent {
         return results;
     }
     //生成最终总结
-    protected void generateFinalSummary(SseEmitter emitter, String toolResults) {
-        try {
-            // 1. 发送总结开始事件
-            sendStreamEvent(emitter, StreamEventType.THINKING, "\n🤖 正在生成最终总结...");
-
-            // 2. 构建总结提示词（包含所有上下文）
-            String summaryPrompt = "请基于以下对话历史和工具执行结果，生成一个精简的任务总结（不超过100字）：\n\n" +
-                    "### 对话历史:\n" + getConversationHistory() + "\n\n" +
-                    "### 工具执行结果:\n" + toolResults;
-
-            // 3. 创建总结专用消息列表
-            List<Message> summaryMessages = new ArrayList<>();
-            summaryMessages.add(new SystemMessage("你是一个专业总结助手，请用简洁的语言总结核心结论"));
-            summaryMessages.add(new UserMessage(summaryPrompt));
-
-            // 4. 调用LLM生成总结
-            Prompt summaryPromptObj = new Prompt(summaryMessages, chatOptions);
-            ChatResponse summaryResponse = getChatClient().prompt(summaryPromptObj)
-                    .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
-                            .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
-                    .call()
-                    .chatResponse();
-
-            // 5. 处理并发送总结
-            if (summaryResponse.getResult() != null &&
-                    summaryResponse.getResult().getOutput() != null) {
-
-                String summary = summaryResponse.getResult().getOutput().getText();
-                if (StrUtil.isNotBlank(summary)) {
-                    // 作为最终响应发送
-                    streamFinalResponse(summary, emitter);
-                    markFinalResponseSent();
-                    setState(AgentState.FINISHED);
-                }
-            }
-        } catch (Exception e) {
-            log.error("总结生成失败", e);
-            sendStreamEvent(emitter, StreamEventType.ERROR, "总结生成失败: " + e.getMessage());
-            // 失败时发送原始结果作为最终响应
-            streamFinalResponse(toolResults, emitter);
-            markFinalResponseSent();
-        }
-    }
+//    protected void generateFinalSummary(SseEmitter emitter, String toolResults) {
+//        try {
+//            // 1. 发送总结开始事件
+//            sendStreamEvent(emitter, StreamEventType.THINKING, "\n🤖 正在生成最终总结...");
+//
+//            // 2. 构建总结提示词（包含所有上下文）
+//            String summaryPrompt = "请基于以下对话历史和工具执行结果，生成一个精简的任务总结（不超过100字）：\n\n" +
+//                    "### 对话历史:\n" + getConversationHistory() + "\n\n" +
+//                    "### 工具执行结果:\n" + toolResults;
+//
+//            // 3. 创建总结专用消息列表
+//            List<Message> summaryMessages = new ArrayList<>();
+//            summaryMessages.add(new SystemMessage("你是一个专业总结助手，请用简洁的语言总结核心结论"));
+//            summaryMessages.add(new UserMessage(summaryPrompt));
+//
+//            // 4. 调用LLM生成总结
+//            Prompt summaryPromptObj = new Prompt(summaryMessages, chatOptions);
+//            ChatResponse summaryResponse = getChatClient().prompt(summaryPromptObj)
+//                    .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
+//                            .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
+//                    .call()
+//                    .chatResponse();
+//
+//            // 5. 处理并发送总结
+//            if (summaryResponse.getResult() != null &&
+//                    summaryResponse.getResult().getOutput() != null) {
+//
+//                String summary = summaryResponse.getResult().getOutput().getText();
+//                if (StrUtil.isNotBlank(summary)) {
+//                    // 作为最终响应发送
+//                    streamFinalResponse(summary, emitter);
+//                    markFinalResponseSent();
+//                    setState(AgentState.FINISHED);
+//                }
+//            }
+//        } catch (Exception e) {
+//            log.error("总结生成失败", e);
+//            sendStreamEvent(emitter, StreamEventType.ERROR, "总结生成失败: " + e.getMessage());
+//            // 失败时发送原始结果作为最终响应
+//            streamFinalResponse(toolResults, emitter);
+//            markFinalResponseSent();
+//        }
+//    }
 
 }

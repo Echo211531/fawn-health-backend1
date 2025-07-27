@@ -51,11 +51,11 @@ public class FawnManus extends ToolCallAgent {
         ChatClient chatClient = ChatClient.builder(dashscopeChatModel)
                 .defaultAdvisors(
                         new MessageChatMemoryAdvisor(mongoChatMemory), //对话记忆
-                        new MyLoggerAdvisor(), //自定义日志
+                        new MyLoggerAdvisor() //自定义日志
                         // 自定义违禁词 Advisor，可按需开启
                         //new ProhibitedWordAdvisor()
                         //自定义推理增强，可按需开启
-                        new ReReadingAdvisor()
+                        //new ReReadingAdvisor()
                 )
 
                 .build();

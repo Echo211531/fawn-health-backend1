@@ -61,7 +61,7 @@ public abstract class BaseAgent {
     // 代理状态
     private AgentState state = AgentState.IDLE;  // 当前状态，默认为闲置
     private int currentStep = 0;       // 当前执行步数
-    private int maxSteps = 6;         // 最大执行步数
+    private int maxSteps = 5;         // 最大执行步数
 
     // LLM 大模型客户端
     protected ChatClient chatClient;
@@ -150,8 +150,14 @@ public abstract class BaseAgent {
                     summaryMessages.add(new SystemMessage("生成任务总结"));
                     summaryMessages.add(new UserMessage(summaryPrompt));
 
-                    Prompt summaryPromptObj = new Prompt(summaryMessages);
-                    ChatResponse response = getChatClient().prompt(summaryPromptObj)
+                    // 优化总结提示词，要求更精确的总结
+                    summaryPrompt = "请基于以下完整的思考和工具执行过程，生成一个该任务的总结（不超过600字）：\n\n" +
+                            "### 完整对话历史:\n" + conversationHistory;
+                    summaryMessages.clear();
+                    summaryMessages.add(new SystemMessage("你是一个专业总结助手，请用简洁的语言总结核心结论"));
+                    summaryMessages.add(new UserMessage(summaryPrompt));
+
+                    ChatResponse response = getChatClient().prompt(summaryPrompt)
                             .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
                                     .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
                             .call()
