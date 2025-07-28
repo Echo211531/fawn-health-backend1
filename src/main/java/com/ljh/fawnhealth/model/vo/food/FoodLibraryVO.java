@@ -3,6 +3,7 @@ package com.ljh.fawnhealth.model.vo.food;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 食物库视图对象（VO），用于在展示层（如前端页面）展示食物相关信息。
@@ -59,4 +60,14 @@ public class FoodLibraryVO {
      * 图片URL
      */
     private String image;
+
+    /**
+     * 是否常见食物:0否,1是
+     */
+    private Integer isCommon;
+
+    /**
+     * 创建时间
+     */
+    private Date createTime;
 }

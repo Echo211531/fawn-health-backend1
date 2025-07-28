@@ -1,5 +1,6 @@
 package com.ljh.fawnhealth.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -10,6 +11,7 @@ import com.ljh.fawnhealth.exception.ThrowUtils;
 import com.ljh.fawnhealth.mapper.FoodCategoriesMapper;
 import com.ljh.fawnhealth.mapper.FoodLibraryMapper;
 import com.ljh.fawnhealth.model.dto.food.FoodAddDTO;
+import com.ljh.fawnhealth.model.dto.food.FoodPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.food.FoodUpdateDTO;
 import com.ljh.fawnhealth.model.entity.FoodCategories;
 import com.ljh.fawnhealth.model.entity.FoodLibrary;
@@ -210,6 +212,78 @@ public class FoodLibraryServiceImpl extends ServiceImpl<FoodLibraryMapper, FoodL
 
         // 转换为VO返回
         return BeanCopyUtils.copyList(foodList, FoodLibraryVO.class);
+    }
+
+    /**
+     * 分页查询食物信息（支持多条件筛选）
+     *
+     * @param queryDTO 分页及查询条件参数
+     * @return 分页结果（包含食物列表及分页信息）
+     */
+    @Override
+    public IPage<FoodLibraryVO> pageQueryFoods(FoodPageQueryDTO queryDTO) {
+        // 1. 创建分页对象
+        Page<FoodLibrary> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
+
+        // 2. 构建查询条件（关联食物表和分类表，筛选未删除的食物）
+        LambdaQueryWrapper<FoodLibrary> queryWrapper = new LambdaQueryWrapper<>();
+
+        // 食物ID精确查询
+        if (queryDTO.getFoodId() != null) {
+            queryWrapper.eq(FoodLibrary::getId, queryDTO.getFoodId());
+        }
+
+        // 食物名称模糊查询
+        String foodName = queryDTO.getFoodName();
+        if (foodName != null && !foodName.trim().isEmpty()) {
+            queryWrapper.like(FoodLibrary::getName, foodName.trim());
+        }
+
+        // 分类名称模糊查询
+        String categoryName = queryDTO.getCategoryName();
+        if (categoryName != null && !categoryName.trim().isEmpty()) {
+            queryWrapper.like(FoodLibrary::getCategoryName, categoryName.trim());
+        }
+
+        // 新增：是否常见食物筛选（精确匹配 0 或 1）
+        if (queryDTO.getIsCommon() != null) {
+            // 确保传入的是有效值（0或1），避免无效参数
+            if (queryDTO.getIsCommon() == 0 || queryDTO.getIsCommon() == 1) {
+                queryWrapper.eq(FoodLibrary::getIsCommon, queryDTO.getIsCommon());
+            } else {
+                // 可选：如果传入无效值，可抛出异常或忽略该条件
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "isCommon 必须为 0 或 1");
+            }
+        }
+
+        // 筛选未删除的食物
+        queryWrapper.eq(FoodLibrary::getIsDelete, 0);
+        // 排序：按创建时间降序（最新添加的食物在前）
+        queryWrapper.orderByDesc(FoodLibrary::getCreateTime);
+
+        // 3. 执行分页查询（查询食物表）
+        Page<FoodLibrary> foodPage = foodLibraryMapper.selectPage(page, queryWrapper);
+
+        // 4. 转换为VO（如果需要对结果加工，如单位转换、字段拼接等）
+        List<FoodLibraryVO> foodVOList = foodPage.getRecords().stream()
+                .map(foodLibrary -> {
+                    FoodLibraryVO vo = new FoodLibraryVO();
+                    // 字段映射（可使用BeanUtils.copyProperties或手动映射）
+                    BeanUtils.copyProperties(foodLibrary, vo);
+                    // 如需额外处理，例如：vo.setCaloriesDesc(foodLibrary.getCalories() + " kcal/100g");
+                    return vo;
+                })
+                .collect(Collectors.toList());
+
+        // 5. 封装分页结果
+        IPage<FoodLibraryVO> resultPage = new Page<>();
+        resultPage.setRecords(foodVOList);
+        resultPage.setTotal(foodPage.getTotal()); // 总条数
+        resultPage.setCurrent(foodPage.getCurrent()); // 当前页码
+        resultPage.setSize(foodPage.getSize()); // 每页条数
+        resultPage.setPages(foodPage.getPages()); // 总页数
+
+        return resultPage;
     }
 
 }

@@ -1,8 +1,10 @@
 package com.ljh.fawnhealth.service;
 
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.dto.food.FoodAddDTO;
+import com.ljh.fawnhealth.model.dto.food.FoodPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.food.FoodUpdateDTO;
 import com.ljh.fawnhealth.model.entity.FoodLibrary;
 import com.ljh.fawnhealth.model.vo.food.FoodLibraryVO;
@@ -62,4 +64,12 @@ public interface FoodLibraryService extends IService<FoodLibrary> {
      * @return 匹配的食物列表
      */
     List<FoodLibraryVO> searchFoodByName(String keyword);
+
+    /**
+     * 分页查询食物信息（支持多条件筛选）
+     *
+     * @param queryDTO 分页及查询条件参数
+     * @return 分页结果（包含食物列表及分页信息）
+     */
+    IPage<FoodLibraryVO> pageQueryFoods(FoodPageQueryDTO queryDTO);
 }

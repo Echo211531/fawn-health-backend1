@@ -1,7 +1,9 @@
 package com.ljh.fawnhealth.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.dto.product.ProductCategoryCreateDTO;
+import com.ljh.fawnhealth.model.dto.product.ProductCategoryPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.product.ProductCategoryUpdateDTO;
 import com.ljh.fawnhealth.model.entity.ProductCategory;
 import com.ljh.fawnhealth.model.vo.product.ProductCategoryVO;
@@ -69,4 +71,12 @@ public interface ProductCategoryService extends IService<ProductCategory> {
      * @return 该分类下的商品列表
      */
     List<ProductVO> getProductsByCategoryId(Long categoryId);
+
+    /**
+     * 分页查询商品分类信息
+     *
+     * @param queryDTO 分页及查询条件参数
+     * @return 分页结果
+     */
+    IPage<ProductCategoryVO> pageQueryProductCategories(ProductCategoryPageQueryDTO queryDTO);
 }

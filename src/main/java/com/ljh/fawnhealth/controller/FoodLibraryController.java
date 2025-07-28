@@ -1,12 +1,9 @@
 package com.ljh.fawnhealth.controller;
-
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.exception.ErrorCode;
-import com.ljh.fawnhealth.model.dto.food.FoodAddDTO;
-import com.ljh.fawnhealth.model.dto.food.FoodCategoryAddDTO;
-import com.ljh.fawnhealth.model.dto.food.FoodCategoryUpdateDTO;
-import com.ljh.fawnhealth.model.dto.food.FoodUpdateDTO;
+import com.ljh.fawnhealth.model.dto.food.*;
 import com.ljh.fawnhealth.model.vo.food.FoodCategoryVO;
 import com.ljh.fawnhealth.model.vo.food.FoodLibraryVO;
 import com.ljh.fawnhealth.service.FoodCategoriesService;
@@ -171,6 +168,32 @@ public class FoodLibraryController {
         log.info("模糊搜索食物，关键词：{}", keyword);
         List<FoodLibraryVO> foodList = foodLibraryService.searchFoodByName(keyword.trim());
         return ResultUtils.success(foodList);
+    }
+
+    /**
+     * 分页查询食物分类列表
+     *
+     * @param queryDTO
+     * @return
+     */
+    @PostMapping("/category/pageQuery")
+    public BaseResponse<IPage<FoodCategoryVO>> pageQueryFoodCategories(@RequestBody FoodCategoryPageQueryDTO queryDTO) {
+        log.info("分页查询食物分类，参数：{}", queryDTO);
+        IPage<FoodCategoryVO> pageResult = foodCategoriesService.pageQueryFoodCategories(queryDTO);
+        return ResultUtils.success(pageResult);
+    }
+
+    /**
+     * 分页查询食物信息（支持多条件筛选）
+     *
+     * @param queryDTO 分页及查询条件参数
+     * @return 分页结果（包含食物列表及分页信息）
+     */
+    @PostMapping("/pageQuery")
+    public BaseResponse<IPage<FoodLibraryVO>> pageQueryFoods(@RequestBody FoodPageQueryDTO queryDTO) {
+        log.info("分页查询食物信息，参数：{}", queryDTO);
+        IPage<FoodLibraryVO> pageResult = foodLibraryService.pageQueryFoods(queryDTO);
+        return ResultUtils.success(pageResult);
     }
 
 
