@@ -1,7 +1,9 @@
 package com.ljh.fawnhealth.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.dto.food.FoodCategoryAddDTO;
+import com.ljh.fawnhealth.model.dto.food.FoodCategoryPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.food.FoodCategoryUpdateDTO;
 import com.ljh.fawnhealth.model.entity.FoodCategories;
 import com.ljh.fawnhealth.model.vo.food.FoodCategoryVO;
@@ -38,4 +40,11 @@ public interface FoodCategoriesService extends IService<FoodCategories> {
      */
     void deleteFoodCategory(Long categoryId);
 
+    /**
+     * 分页查询食物分类列表
+     *
+     * @param queryDTO
+     * @return
+     */
+    IPage<FoodCategoryVO> pageQueryFoodCategories(FoodCategoryPageQueryDTO queryDTO);
 }

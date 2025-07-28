@@ -1,13 +1,11 @@
 package com.ljh.fawnhealth.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
-import com.ljh.fawnhealth.model.dto.product.ProductCategoryCreateDTO;
-import com.ljh.fawnhealth.model.dto.product.ProductCategoryUpdateDTO;
-import com.ljh.fawnhealth.model.dto.product.ProductCreateDTO;
-import com.ljh.fawnhealth.model.dto.product.ProductUpdateDTO;
+import com.ljh.fawnhealth.model.dto.product.*;
 import com.ljh.fawnhealth.model.vo.product.ProductCategoryVO;
 import com.ljh.fawnhealth.model.vo.product.ProductVO;
 import com.ljh.fawnhealth.service.ProductCategoryService;
@@ -119,5 +117,17 @@ public class ProductCategoryController {
         return ResultUtils.success(productList);
     }
 
+    /**
+     * 分页查询商品分类信息
+     *
+     * @param queryDTO 分页及查询条件参数
+     * @return 分页结果
+     */
+    @PostMapping("/pageQuery")
+    public BaseResponse<IPage<ProductCategoryVO>> pageQueryProductCategories(@RequestBody ProductCategoryPageQueryDTO queryDTO) {
+        IPage<ProductCategoryVO> pageResult = productCategoryService.pageQueryProductCategories(queryDTO);
+        log.info("分页查询商品分类信息，参数：{}，结果：{}", queryDTO, pageResult);
+        return ResultUtils.success(pageResult);
+    }
 
 }

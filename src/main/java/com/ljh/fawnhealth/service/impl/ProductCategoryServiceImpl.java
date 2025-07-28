@@ -1,6 +1,9 @@
 package com.ljh.fawnhealth.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.ljh.fawnhealth.exception.BusinessException;
@@ -8,6 +11,7 @@ import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.ProductCategoryMapper;
 import com.ljh.fawnhealth.mapper.ProductMapper;
 import com.ljh.fawnhealth.model.dto.product.ProductCategoryCreateDTO;
+import com.ljh.fawnhealth.model.dto.product.ProductCategoryPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.product.ProductCategoryUpdateDTO;
 import com.ljh.fawnhealth.model.entity.Product;
 import com.ljh.fawnhealth.model.entity.ProductCategory;
@@ -349,6 +353,55 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
             BeanUtils.copyProperties(product, vo);
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 分页查询商品分类信息
+     *
+     * @param queryDTO 分页及查询条件参数
+     * @return 分页结果
+     */
+    @Override
+    public IPage<ProductCategoryVO> pageQueryProductCategories(ProductCategoryPageQueryDTO queryDTO) {
+        // 创建分页对象
+        Page<ProductCategory> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
+
+        // 构建查询条件
+        LambdaQueryWrapper<ProductCategory> queryWrapper = new LambdaQueryWrapper<>();
+        if (queryDTO.getCategoryId() != null) {
+            queryWrapper.eq(ProductCategory::getId, queryDTO.getCategoryId());
+        }
+        // 无需额外导入，直接使用 JDK 原生方法
+        if (queryDTO.getName() != null && !queryDTO.getName().trim().isEmpty()) {
+            queryWrapper.like(ProductCategory::getName, queryDTO.getName());
+        }
+        if (queryDTO.getStatus() != null) {
+            queryWrapper.eq(ProductCategory::getStatus, queryDTO.getStatus());
+        }
+        queryWrapper.eq(ProductCategory::getIsDelete, 0); // 假设表中有 is_delete 字段标记逻辑删除
+        queryWrapper.orderByDesc(ProductCategory::getCreateTime); // 按创建时间倒序排序，可根据需求调整
+
+        // 执行分页查询
+        Page<ProductCategory> productCategoryPage = productCategoryMapper.selectPage(page, queryWrapper);
+
+        // 转换为 VO 分页结果（如果需要对查询结果做进一步处理，比如拼接字段等）
+        List<ProductCategoryVO> productCategoryVOList = productCategoryPage.getRecords().stream()
+                .map(productCategory -> {
+                    ProductCategoryVO vo = new ProductCategoryVO();
+                    // 这里使用 BeanUtils 或者手动映射字段，假设 ProductCategoryVO 和 ProductCategory 字段能对应上
+                    BeanUtils.copyProperties(productCategory, vo);
+                    return vo;
+                })
+                .collect(Collectors.toList());
+
+        IPage<ProductCategoryVO> resultPage = new Page<>();
+        resultPage.setRecords(productCategoryVOList);
+        resultPage.setTotal(productCategoryPage.getTotal());
+        resultPage.setCurrent(productCategoryPage.getCurrent());
+        resultPage.setSize(productCategoryPage.getSize());
+        resultPage.setPages(productCategoryPage.getPages());
+
+        return resultPage;
     }
 }
 
