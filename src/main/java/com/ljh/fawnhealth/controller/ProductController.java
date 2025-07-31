@@ -1,14 +1,13 @@
 package com.ljh.fawnhealth.controller;
 
 import com.alibaba.nacos.api.model.v2.Result;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
-import com.ljh.fawnhealth.model.dto.product.ProductCreateDTO;
-import com.ljh.fawnhealth.model.dto.product.ProductListQueryDTO;
-import com.ljh.fawnhealth.model.dto.product.ProductUpdateDTO;
+import com.ljh.fawnhealth.model.dto.product.*;
 import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.WeightDTO;
@@ -157,6 +156,49 @@ public class ProductController {
 
         List<ProductVO> productVOs = productService.searchProductsByCategory(name.trim());
         return ResultUtils.success(productVOs);
+    }
+
+    /**
+     * 分页查询商品列表（支持多条件筛选）
+     * 筛选条件：商品ID（精确）、商品名称（模糊）、商品状态（精确）
+     * 仅查询未删除（is_delete=0）的商品
+     *
+     * @param queryDTO 包含查询条件和分页参数
+     * @return 分页结果（包含商品列表和分页信息）
+     */
+    @PostMapping("/page")
+    public BaseResponse<IPage<ProductVO>> pageQueryProducts(@RequestBody ProductPageQueryDTO queryDTO) {
+        log.info("分页查询商品列表，参数：{}", queryDTO);
+
+        // 校验分页参数合法性
+        if (queryDTO.getPageNum() < 1) {
+            queryDTO.setPageNum(1); // 页码默认1
+        }
+        if (queryDTO.getPageSize() < 1 || queryDTO.getPageSize() > 100) {
+            queryDTO.setPageSize(10); // 每页条数默认10，最大100
+        }
+
+        IPage<ProductVO> productPage = productService.pageQueryProducts(queryDTO);
+        return ResultUtils.success(productPage);
+    }
+
+    /**
+     * 通用更新商品状态接口（上架、下架等，通过参数区分）
+     * @param updateStatusDTO 包含商品ID和要更新的状态
+     * @return 操作结果
+     */
+    @PostMapping("/updateStatus")
+    public BaseResponse<String> updateProductStatus(@RequestBody ProductUpdateStatusDTO updateStatusDTO) {
+        Long productId = updateStatusDTO.getProductId();
+        Integer status = updateStatusDTO.getStatus();
+        // 简单参数校验，可根据实际需求完善
+        if (productId == null || status == null || (status != 0 && status != 1)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品ID和状态参数不合法");
+        }
+        productService.updateFoodStatus(productId, status);
+        String message = status == 1 ? "商品上架成功" : "商品下架成功";
+        log.info(message + "，商品ID: {}", productId);
+        return ResultUtils.success(message);
     }
 
 }

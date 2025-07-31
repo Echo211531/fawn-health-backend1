@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.PageDTO;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.dto.coupons.CouponsFormDTO;
 import com.ljh.fawnhealth.model.dto.coupons.CouponsIssueFormDTO;
+import com.ljh.fawnhealth.model.dto.coupons.CouponsSearchDTO;
 import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.model.query.coupons.CouponsQuery;
 import com.ljh.fawnhealth.model.vo.coupons.CouponsDetailVO;
@@ -80,4 +81,11 @@ public interface CouponsService extends IService<Coupons> {
      * @param couponsId 待暂停发放的优惠券ID
      */
     void pauseIssue(Long couponsId);
+
+    /**
+     * 多条件分页查询优惠券
+     * @param queryDTO 查询条件
+     * @return 分页结果
+     */
+    PageDTO<CouponsPageVO> searchCoupons(CouponsSearchDTO queryDTO);
 }

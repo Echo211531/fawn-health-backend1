@@ -1,18 +1,14 @@
 package com.ljh.fawnhealth.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
-import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
-import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
-import com.ljh.fawnhealth.model.dto.user.WeightDTO;
+import com.ljh.fawnhealth.model.dto.user.*;
 import com.ljh.fawnhealth.model.entity.User;
-import com.ljh.fawnhealth.model.vo.user.UserInfoVO;
-import com.ljh.fawnhealth.model.vo.user.UserLoginStatisticsVO;
-import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
-import com.ljh.fawnhealth.model.vo.user.UserNewStatisticsVO;
+import com.ljh.fawnhealth.model.vo.user.*;
 import com.ljh.fawnhealth.service.EmailService;
 import com.ljh.fawnhealth.service.UserService;
 import com.ljh.fawnhealth.utils.CharUtil;
@@ -21,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -258,6 +255,54 @@ public class UserController {
     public BaseResponse<UserLoginStatisticsVO> getLoginStatistics() {
         UserLoginStatisticsVO statisticsVO = userService.getLoginStatistics();
         return ResultUtils.success(statisticsVO);
+    }
+
+    /**
+     * 分页查询用户列表（支持多条件筛选）
+     * 适用于管理员后台查询用户数据
+     *
+     * @param queryDTO 分页及查询条件
+     * @return 分页结果（包含用户列表及分页信息）
+     */
+    @PostMapping("/pageQuery")
+    public BaseResponse<IPage<UserVO>> pageQueryUsers(@RequestBody UserPageQueryDTO queryDTO) {
+        log.info("分页查询用户列表，参数：{}", queryDTO);
+        // 校验分页参数合法性
+        if (queryDTO.getPageNum() < 1 || queryDTO.getPageSize() < 1 || queryDTO.getPageSize() > 100) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "页码或每页条数无效（页码≥1，条数1-100）");
+        }
+        IPage<UserVO> pageResult = userService.pageQueryUsers(queryDTO);
+        return ResultUtils.success(pageResult);
+    }
+
+    /**
+     * 启用/禁用用户账号
+     * 仅管理员可操作，支持批量处理（单个ID或多个ID用逗号分隔）
+     *
+     * @param userIds  用户ID列表（单个ID或多个ID用逗号分隔，如"1,2,3"）
+     * @param status   目标状态（0-禁用，1-启用）
+     * @param id  请求对象
+     * @return 操作结果
+     */
+    @PostMapping("/updateStatus")
+    public BaseResponse<String> updateUserStatus(@RequestParam String userIds, @RequestParam Integer status, @RequestParam Long id) {
+        log.info("修改用户账号状态，用户ID：{}，目标状态：{}", userIds, status);
+        userService.updateUserStatus(userIds, status, id);
+        return ResultUtils.success("用户状态修改成功");
+    }
+
+    /**
+     * 添加管理员账号
+     * 仅超级管理员可操作，默认角色为admin，密码默认123456（MD5加密）
+     *
+     * @param adminAddDTO 管理员信息（用户名、性别、邮箱）
+     * @return 添加结果
+     */
+    @PostMapping("/addAdmin")
+    public BaseResponse<String> addAdmin(@Validated @RequestBody AdminAddDTO adminAddDTO,Long id) {
+        log.info("添加管理员账号，参数：{}", adminAddDTO);
+        userService.addAdmin(adminAddDTO,id);
+        return ResultUtils.success("管理员账号创建成功，默认密码：123456");
     }
 
 }

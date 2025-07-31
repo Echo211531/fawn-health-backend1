@@ -144,7 +144,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     @Override
     public int receiveCoupon(Long couponsId, Long userId) {
         // 1.查询优惠券
-        Coupons coupons = queryCouponByCache(couponsId);
+        Coupons coupons = couponsMapper.selectById(couponsId);
         System.out.println("优惠券信息："+ coupons);
         if (coupons == null) {
             throw new BusinessException(ErrorCode.COUPON_NOT_FOUND);
@@ -304,6 +304,10 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             // 5.校验并生成用户券
             // 5.1.查询优惠券
             Coupons coupons = couponsMapper.selectById(exchangeCode.getExchangeTargetId());
+            // 新增：检查优惠券是否为暂停状态（假设暂停状态值为5，根据实际枚举值修改）
+            if (coupons.getStatus() == 5) { // 这里的5需要替换为实际的"暂停"状态枚举值
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "优惠券已暂停，无法兑换");
+            }
             // 5.2.校验并生成用户券，更新兑换码状态
             checkAndCreateUserCoupon(coupons, userId, (int) serialNum);
         } catch (Exception e) {
@@ -357,6 +361,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                         vo.setCouponName(coupons1.getName());
                         vo.setDiscountType(coupons1.getDiscountType());
                         vo.setThresholdAmount(coupons1.getThresholdAmount());
+                        vo.setDiscountValue(coupons1.getDiscountValue());
                         vo.setMaxDiscountAmount(coupons1.getMaxDiscountAmount());
                     }
 

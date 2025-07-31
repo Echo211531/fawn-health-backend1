@@ -16,6 +16,10 @@ public interface CouponsMapper extends BaseMapper<Coupons> {
 
     @Update("UPDATE coupons SET issue_num = issue_num + 1 WHERE id = #{couponsId} AND issue_num < total_num")
     int incrIssueNum(@Param("couponsId") Long couponsId);
+
+    // 逻辑删除方法，更新 is_delete 字段
+    @Update("UPDATE coupons SET is_delete = 1 WHERE id = #{id}")
+    int logicDeleteById(Long id);
 }
 
 

@@ -62,4 +62,9 @@ public class UserCouponsVO {
      * 最大优惠金额（单位：元）
      */
     private BigDecimal maxDiscountAmount;
+
+    /**
+     * 折扣值，如果是满减则存满减金额，如果是折扣，则存折扣率，8折就是存80
+     */
+    private Integer discountValue;
 }

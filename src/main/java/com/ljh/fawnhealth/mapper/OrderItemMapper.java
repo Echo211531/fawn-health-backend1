@@ -1,7 +1,11 @@
 package com.ljh.fawnhealth.mapper;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.ljh.fawnhealth.model.entity.OrderItem;
+import org.apache.ibatis.annotations.Select;
+import org.springframework.data.repository.query.Param;
 
 /**
 * @author 27105
@@ -10,6 +14,10 @@ import com.ljh.fawnhealth.model.entity.OrderItem;
 * @Entity com.ljh.domain.OrderItem
 */
 public interface OrderItemMapper extends BaseMapper<OrderItem> {
+
+    // 直接通过参数传递条件，避免使用 ew 变量
+    @Select("SELECT COALESCE(SUM(quantity), 0) FROM order_item WHERE product_id = #{productId} AND is_delete = #{isDelete}")
+    Integer sumQuantity(@Param("productId") Long productId, @Param("isDelete") Integer isDelete);
 
 }
 
