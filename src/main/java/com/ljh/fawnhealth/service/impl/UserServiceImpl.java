@@ -1,6 +1,10 @@
 package com.ljh.fawnhealth.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.config.JwtProperties;
 import com.ljh.fawnhealth.constant.JwtClaimsConstant;
@@ -8,12 +12,13 @@ import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.UserMapper;
+import com.ljh.fawnhealth.model.dto.user.AdminAddDTO;
+import com.ljh.fawnhealth.model.dto.user.AdminUpdateDTO;
+import com.ljh.fawnhealth.model.dto.user.UserPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.model.enums.user.UserRole;
-import com.ljh.fawnhealth.model.vo.user.UserLoginStatisticsVO;
-import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
-import com.ljh.fawnhealth.model.vo.user.UserNewStatisticsVO;
+import com.ljh.fawnhealth.model.vo.user.*;
 import com.ljh.fawnhealth.service.UserService;
 import com.ljh.fawnhealth.utils.JwtUtil;
 import io.micrometer.common.util.StringUtils;
@@ -21,6 +26,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
@@ -28,6 +34,8 @@ import org.springframework.util.DigestUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -615,6 +623,307 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         statisticsVO.setStatisticTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
 
         return statisticsVO;
+    }
+
+    /**
+     * 分页查询用户列表（支持多条件筛选）
+     * 适用于管理员后台查询用户数据
+     *
+     * @param queryDTO 分页及查询条件
+     * @return 分页结果（包含用户列表及分页信息）
+     */
+    @Override
+    public IPage<UserVO> pageQueryUsers(UserPageQueryDTO queryDTO) {
+        // 1. 创建分页对象
+        Page<User> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
+
+        // 2. 构建查询条件
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+
+        // 用户ID精确查询
+        if (queryDTO.getUserId() != null) {
+            queryWrapper.eq(User::getId, queryDTO.getUserId());
+        }
+
+        // 邮箱模糊查询（支持部分匹配，如输入"test"匹配"test@example.com"）
+        String email = queryDTO.getEmail();
+        if (email != null && !email.trim().isEmpty()) {
+            queryWrapper.like(User::getEmail, email.trim());
+        }
+
+        // 性别精确查询（0/1/2）
+        if (queryDTO.getGender() != null) {
+            // 校验性别参数有效性
+            if (queryDTO.getGender() < 0 || queryDTO.getGender() > 2) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "性别参数无效（0-未知，1-男，2-女）");
+            }
+            queryWrapper.eq(User::getGender, queryDTO.getGender());
+        }
+
+        // 是否VIP精确查询（0/1）
+        if (queryDTO.getIsVip() != null) {
+            // 校验VIP参数有效性
+            if (queryDTO.getIsVip() != 0 && queryDTO.getIsVip() != 1) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "VIP参数无效（0-否，1-是）");
+            }
+            queryWrapper.eq(User::getIsVip, queryDTO.getIsVip());
+        }
+
+        // 账号状态精确查询（0/1）
+        if (queryDTO.getStatus() != null) {
+            // 校验状态参数有效性
+            if (queryDTO.getStatus() != 0 && queryDTO.getStatus() != 1) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "状态参数无效（0-禁用，1-正常）");
+            }
+            queryWrapper.eq(User::getStatus, queryDTO.getStatus());
+        }
+
+        // 排序：默认按创建时间降序（最新注册用户在前）
+        queryWrapper.orderByDesc(User::getCreateTime);
+
+        // 3. 执行分页查询
+        Page<User> userPage = this.page(page, queryWrapper);
+
+        // 4. 转换为VO（脱敏处理，只返回必要字段）
+        List<UserVO> userInfoVOList = userPage.getRecords().stream()
+                .map(user -> {
+                    UserVO vo = new UserVO();
+                    BeanUtils.copyProperties(user, vo); // 复制同名字段（如id、nickname、gender等）
+                    // 如需额外处理（如隐藏邮箱部分字符），可在此处添加
+                    // vo.setEmail(maskEmail(user.getEmail()));
+                    return vo;
+                })
+                .collect(Collectors.toList());
+
+        // 5. 封装分页结果
+        IPage<UserVO> resultPage = new Page<>();
+        resultPage.setRecords(userInfoVOList);
+        resultPage.setTotal(userPage.getTotal()); // 总条数
+        resultPage.setCurrent(userPage.getCurrent()); // 当前页码
+        resultPage.setSize(userPage.getSize()); // 每页条数
+        resultPage.setPages(userPage.getPages()); // 总页数
+
+        return resultPage;
+    }
+
+    /**
+     * 启用/禁用用户账号
+     * 仅管理员可操作，支持批量处理（单个ID或多个ID用逗号分隔）
+     *
+     * @param userIds 用户ID列表（单个ID或多个ID用逗号分隔，如"1,2,3"）
+     * @param status  目标状态（0-禁用，1-启用）
+     * @param adminId 请求对象
+     * @return 操作结果
+     */
+    @Transactional
+    @Override
+    public void updateUserStatus(String userIds, Integer status, Long adminId) {
+        // 1. 权限校验（仅管理员可操作）
+        User loginUser = userMapper.selectById(adminId);
+        if (loginUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR, "未登录");
+        }
+        if (!"admin".equals(loginUser.getRole()) && !"super_admin".equals(loginUser.getRole())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+
+        // 2. 参数校验（用户ID）
+        if (userIds == null || userIds.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID不能为空");
+        }
+        String[] userIdArray = userIds.split(",");
+        if (userIdArray.length == 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID格式错误（示例：1 或 1,2,3）");
+        }
+
+        // 3. 参数校验（状态值）
+        if (status == null || (status != 0 && status != 1)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "状态参数无效（0-禁用，1-启用）");
+        }
+
+        // 4. 转换用户ID为Long类型并校验格式
+        List<Long> userIdList;
+        try {
+            userIdList = Arrays.stream(userIdArray)
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID必须为数字（示例：1 或 1,2,3）");
+        }
+
+        // 5. 通过 Mapper 校验用户是否存在
+        List<User> existUsers = userMapper.selectBatchIds(userIdList);
+        if (existUsers.size() != userIdList.size()) {
+            List<Long> existIds = existUsers.stream().map(User::getId).collect(Collectors.toList());
+            List<Long> notExistIds = userIdList.stream()
+                    .filter(id -> !existIds.contains(id))
+                    .collect(Collectors.toList());
+            throw new BusinessException(ErrorCode.USER_NOTFOUND, "以下用户不存在：" + notExistIds);
+        }
+
+        // 6. 通过 Mapper 执行批量更新（替代 this.update）
+        LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.in(User::getId, userIdList)
+                .set(User::getStatus, status);
+
+        int updateCount = userMapper.update(null, updateWrapper);
+        if (updateCount <= 0) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "修改用户状态失败");
+        }
+    }
+
+    /**
+     * 添加管理员账号
+     * 仅超级管理员可操作，默认角色为admin，密码默认123456（MD5加密）
+     *
+     * @param adminAddDTO 管理员信息（用户名、性别、邮箱）
+     * @return 添加结果
+     */
+    @Override
+    public void addAdmin(AdminAddDTO adminAddDTO, Long id) {
+        // 1. 权限校验：仅超级管理员可添加管理员
+        User loginUser = userMapper.selectById(id);
+        if (loginUser == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        if (!"super_admin".equals(loginUser.getRole())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作，仅超级管理员可添加管理员");
+        }
+
+        // 2. 校验邮箱唯一性（数据库唯一索引也会限制，这里提前校验并返回友好提示）
+        User existUser = userMapper.selectOne(
+                new QueryWrapper<User>()
+                        .lambda()
+                        .eq(User::getEmail, adminAddDTO.getEmail())
+        );
+        if (existUser != null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱已被注册");
+        }
+
+        // 3. 构建用户实体（填充默认值）
+        User adminUser = new User();
+        adminUser.setUserName(adminAddDTO.getUsername());
+        adminUser.setGender(adminAddDTO.getGender());
+        adminUser.setEmail(adminAddDTO.getEmail());
+
+        // 4. 处理密码：默认123456，MD5加密
+        String defaultPassword = "123456";
+        String encryptedPassword = DigestUtils.md5DigestAsHex(defaultPassword.getBytes(StandardCharsets.UTF_8));
+        adminUser.setPassword(encryptedPassword);
+
+        // 5. 设置默认值
+        adminUser.setRole("admin"); // 角色默认为管理员
+        adminUser.setNickname("管理员");
+        adminUser.setIsVip(0); // 非VIP
+        adminUser.setAvatar("http://fawn-health.oss-cn-chengdu.aliyuncs.com/fawn-health-userAvatar.png"); // 默认头像
+        adminUser.setEmailVerified(0); // 邮箱未验证
+        adminUser.setStatus(1); // 账号默认启用
+
+        // 6. 插入数据库
+        int insert = userMapper.insert(adminUser);
+        if (insert != 1) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "管理员账号创建失败");
+        }
+    }
+
+    /**
+     * 管理员修改个人信息接口
+     *
+     * @param adminId        管理员ID（路径参数，用于定位修改对象）
+     * @param adminUpdateDTO 管理员信息更新参数
+     * @return 更新后的管理员信息
+     */
+    @Override
+    public User updateAdminInfo(Long adminId, AdminUpdateDTO adminUpdateDTO) {
+        // 1. 基础校验：ID合法性
+        if (adminId == null || adminId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "管理员ID无效");
+        }
+
+        // 2. 校验管理员是否存在
+        User admin = this.getById(adminId);
+        if (admin == null) {
+            throw new BusinessException(ErrorCode.USER_NOTFOUND, "管理员不存在");
+        }
+
+        // 3. 权限校验：是否为管理员角色
+        if (!"admin".equals(admin.getRole()) && !"super_admin".equals(admin.getRole())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前账号无管理员权限");
+        }
+
+        // 4. 字段校验与赋值
+        // 4.1 昵称校验（1-50字符）
+        if (adminUpdateDTO.getNickname() != null) {
+            String nickname = adminUpdateDTO.getNickname().trim();
+            if (nickname.isEmpty() || nickname.length() > 50) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称长度必须为1-50字符");
+            }
+            admin.setNickname(nickname);
+        }
+
+        // 4.2 头像URL校验（非空时校验格式）
+        if (adminUpdateDTO.getAvatar() != null) {
+            String avatar = adminUpdateDTO.getAvatar().trim();
+            if (!avatar.isEmpty()
+                    && !avatar.startsWith("http://")
+                    && !avatar.startsWith("https://")) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "头像URL格式必须以http://或https://开头");
+            }
+            admin.setAvatar(avatar);
+        }
+
+        // 4.3 性别校验（必须为0/1/2）
+        if (adminUpdateDTO.getGender() != null) {
+            if (adminUpdateDTO.getGender() < 0 || adminUpdateDTO.getGender() > 2) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "性别必须为0（未知）、1（男）、2（女）");
+            }
+            admin.setGender(adminUpdateDTO.getGender());
+        }
+
+        admin.setBirthday(adminUpdateDTO.getBirthday());
+
+        // 4.4 用户名校验（4-20位字母数字）
+        if (adminUpdateDTO.getUsername() != null) {
+            String username = adminUpdateDTO.getUsername().trim();
+            if (username.isEmpty() || username.length() < 4 || username.length() > 20) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名长度必须为4-20字符");
+            }
+            if (!username.matches("^[a-zA-Z0-9]+$")) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名只能包含字母和数字");
+            }
+            // 额外校验用户名唯一性（避免重复）
+            LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(User::getUserName, username)
+                    .ne(User::getId, adminId); // 排除当前管理员自身
+            if (this.count(queryWrapper) > 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名已被占用");
+            }
+            admin.setUserName(username);
+        }
+
+        // 5. 执行更新
+        boolean updateSuccess = this.updateById(admin);
+        if (!updateSuccess) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "修改个人信息失败，请重试");
+        }
+
+        // 6. 返回更新后的管理员信息
+        return this.getById(adminId);
+    }
+
+    /**
+     * 邮箱脱敏（如：test@example.com → t***@example.com）
+     */
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return email;
+        }
+        String[] parts = email.split("@");
+        String prefix = parts[0];
+        if (prefix.length() <= 1) {
+            return prefix + "***@" + parts[1];
+        }
+        return prefix.charAt(0) + "***@" + parts[1];
     }
 
     /**

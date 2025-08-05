@@ -2,6 +2,8 @@ package com.ljh.fawnhealth.controller;
 
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
+import com.ljh.fawnhealth.model.dto.order.CouponDiscountDTO;
+import com.ljh.fawnhealth.model.dto.order.OrderProductDTO;
 import com.ljh.fawnhealth.model.vo.coupons.UserCouponsVO;
 import com.ljh.fawnhealth.service.UserCouponService;
 import jakarta.annotation.Resource;
@@ -76,5 +78,19 @@ public class UserCouponController {
         log.info("查询用户[{}]的优惠券，状态: {}", userId, status);
         List<UserCouponsVO> couponList = userCouponService.listUserCoupons(userId, status);
         return ResultUtils.success(couponList);
+    }
+
+    /**
+     * 返回可用优惠券信息
+     *
+     * @param orderProducts
+     * @return
+     */
+    @PostMapping("available")
+    public List<CouponDiscountDTO> findDiscountSolution(
+            @RequestBody List<OrderProductDTO> orderProducts,  // 接收请求体JSON数组
+            @RequestParam Long userId  // 明确从URL参数获取userId
+    ) {
+        return userCouponService.findDiscountSolution(orderProducts, userId);
     }
 }

@@ -3,9 +3,7 @@ package com.ljh.fawnhealth.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
-import com.ljh.fawnhealth.model.dto.order.OrderCreateDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderPageQueryDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderStatusUpdateDTO;
+import com.ljh.fawnhealth.model.dto.order.*;
 import com.ljh.fawnhealth.model.vo.order.OrderAmountStatisticsVO;
 import com.ljh.fawnhealth.model.vo.order.OrderChartVO;
 import com.ljh.fawnhealth.model.vo.order.OrderStatisticsVO;
@@ -140,4 +138,46 @@ public class OrderController {
         OrderVO orderVO = orderService.updateOrderStatus(updateDTO);
         return ResultUtils.success(orderVO);
     }
+
+    /**
+     * 用户确认订单收货
+     * 更新订单确认状态为“已确认”，记录收货时间，同时将订单状态更新为“已完成”
+     *
+     * @param confirmReceiveDTO 确认收货参数（包含订单ID）
+     * @return 更新后的订单信息
+     */
+    @PostMapping("/confirmReceive")
+    public BaseResponse<OrderVO> confirmOrderReceive(@Validated @RequestBody OrderConfirmReceiveDTO confirmReceiveDTO) {
+        log.info("用户确认订单收货：{}", confirmReceiveDTO);
+        OrderVO orderVO = orderService.confirmOrderReceive(confirmReceiveDTO);
+        return ResultUtils.success(orderVO);
+    }
+
+    /**
+     * 用户申请订单退款
+     * 验证订单状态后，更新订单为“已退款”状态，记录退款信息
+     *
+     * @param refundDTO 退款申请参数（订单ID、退款原因等）
+     * @return 更新后的订单信息
+     */
+    @PostMapping("/applyRefund")
+    public BaseResponse<OrderVO> applyOrderRefund(@Validated @RequestBody OrderRefundDTO refundDTO) {
+        log.info("用户申请订单退款：{}", refundDTO);
+        OrderVO orderVO = orderService.applyOrderRefund(refundDTO);
+        return ResultUtils.success(orderVO);
+    }
+
+    /**
+     * 管理员审核退款申请
+     *
+     * @param auditDTO 审核参数（订单ID、审核结果、备注）
+     * @return 更新后的订单信息
+     */
+    @PostMapping("/auditRefund")
+    public BaseResponse<OrderVO> auditRefund(@Validated @RequestBody OrderRefundAuditDTO auditDTO) {
+        log.info("管理员审核退款申请：{}", auditDTO);
+        OrderVO orderVO = orderService.auditRefund(auditDTO);
+        return ResultUtils.success(orderVO);
+    }
+
 }

@@ -11,9 +11,12 @@ import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.CouponsMapper;
 import com.ljh.fawnhealth.mapper.UserCouponMapper;
 import com.ljh.fawnhealth.model.dto.coupons.UserCouponDTO;
+import com.ljh.fawnhealth.model.dto.order.CouponDiscountDTO;
+import com.ljh.fawnhealth.model.dto.order.OrderProductDTO;
 import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.model.entity.ExchangeCode;
 import com.ljh.fawnhealth.model.entity.UserCoupon;
+import com.ljh.fawnhealth.model.enums.coupons.DiscountType;
 import com.ljh.fawnhealth.model.enums.coupons.ExchangeCodeStatus;
 import com.ljh.fawnhealth.model.enums.coupons.UserCouponStatus;
 import com.ljh.fawnhealth.model.vo.coupons.UserCouponsVO;
@@ -21,8 +24,11 @@ import com.ljh.fawnhealth.mq.MessageProducer;
 import com.ljh.fawnhealth.mq.MqConstant;
 import com.ljh.fawnhealth.service.ExchangeCodeService;
 import com.ljh.fawnhealth.service.UserCouponService;
+import com.ljh.fawnhealth.strategy.discount.Discount;
+import com.ljh.fawnhealth.strategy.discount.DiscountStrategy;
 import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import com.ljh.fawnhealth.utils.CodeUtil;
+import com.ljh.fawnhealth.utils.PermuteUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateUtils;
@@ -38,10 +44,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 
 
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -144,7 +147,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     @Override
     public int receiveCoupon(Long couponsId, Long userId) {
         // 1.查询优惠券
-        Coupons coupons = queryCouponByCache(couponsId);
+        Coupons coupons = couponsMapper.selectById(couponsId);
         System.out.println("优惠券信息："+ coupons);
         if (coupons == null) {
             throw new BusinessException(ErrorCode.COUPON_NOT_FOUND);
@@ -304,6 +307,10 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             // 5.校验并生成用户券
             // 5.1.查询优惠券
             Coupons coupons = couponsMapper.selectById(exchangeCode.getExchangeTargetId());
+            // 新增：检查优惠券是否为暂停状态（假设暂停状态值为5，根据实际枚举值修改）
+            if (coupons.getStatus() == 5) { // 这里的5需要替换为实际的"暂停"状态枚举值
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "优惠券已暂停，无法兑换");
+            }
             // 5.2.校验并生成用户券，更新兑换码状态
             checkAndCreateUserCoupon(coupons, userId, (int) serialNum);
         } catch (Exception e) {
@@ -357,6 +364,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                         vo.setCouponName(coupons1.getName());
                         vo.setDiscountType(coupons1.getDiscountType());
                         vo.setThresholdAmount(coupons1.getThresholdAmount());
+                        vo.setDiscountValue(coupons1.getDiscountValue());
                         vo.setMaxDiscountAmount(coupons1.getMaxDiscountAmount());
                     }
 
@@ -365,7 +373,216 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 返回可用优惠券信息
+     *
+     * @param orderProducts
+     * @return
+     */
+//    @Override
+//    public List<CouponDiscountDTO> findDiscountSolution(List<OrderProductDTO> orderProducts, Long userId) {
+//        List<Coupons> coupons = userCouponMapper.querMyCoupons(userId);
+//        if(coupons == null || coupons.isEmpty()){
+//            return Collections.emptyList();
+//        }
+//
+//        int totalAmount = orderProducts.stream().mapToInt(OrderProductDTO::getPrice).sum();
+//        List<Coupons> availableCoupons = coupons.stream()
+//                .filter(c -> DiscountStrategy.getDiscount(DiscountType.of(c.getDiscountType())).canUse(totalAmount, c))
+//                .collect(Collectors.toList());
+//
+//        if(availableCoupons == null || availableCoupons.isEmpty()){
+//            return Collections.emptyList();
+//        }
+//
+//        // 3.排列组合出所有方案
+//        // 3.1.细筛（找出每一个优惠券的可用的课程，判断课程总价是否达到优惠券的使用需求）
+//        Map<Coupons, List<OrderProductDTO>> availableCouponMap = findAvailableCoupons(availableCoupons, orderProducts);
+//        if(availableCouponMap == null || availableCouponMap.isEmpty()){
+//            return Collections.emptyList();
+//        }
+//        // 3.2.排列组合
+//        availableCoupons = new ArrayList<>(availableCouponMap.keySet());
+//        List<List<Coupons>> solutions = PermuteUtil.permute(availableCoupons);
+//        // 3.3.添加单券的方案
+//        for (Coupons c : availableCoupons) {
+//            solutions.add(List.of(c));
+//        }
+//
+//        // 4.计算方案的优惠明细
+//        List<CouponDiscountDTO> list =
+//                Collections.synchronizedList(new ArrayList<>(solutions.size()));
+//        for (List<Coupons> solution : solutions) {
+//            list.add(calculateSolutionDiscount(availableCouponMap, orderProducts, solution));
+//        }
+//
+//        // 5.筛选最优解
+//        return findBestSolution(list);
+//    }
 
+    @Override
+    public List<CouponDiscountDTO> findDiscountSolution(List<OrderProductDTO> orderProducts, Long userId) {
+        List<Coupons> coupons = userCouponMapper.querMyCoupons(userId);
+        if(coupons == null || coupons.isEmpty()){
+            return Collections.emptyList();
+        }
+
+        int totalAmount = orderProducts.stream().mapToInt(OrderProductDTO::getPrice).sum();
+        List<Coupons> availableCoupons = coupons.stream()
+                .filter(c -> DiscountStrategy.getDiscount(DiscountType.of(c.getDiscountType())).canUse(totalAmount, c))
+                .collect(Collectors.toList());
+
+        if(availableCoupons == null || availableCoupons.isEmpty()){
+            return Collections.emptyList();
+        }
+
+        // 3.只保留单券方案（删除多券组合逻辑）
+        // 3.1.细筛（找出每一个优惠券的可用的课程，判断课程总价是否达到优惠券的使用需求）
+        Map<Coupons, List<OrderProductDTO>> availableCouponMap = findAvailableCoupons(availableCoupons, orderProducts);
+        if(availableCouponMap == null || availableCouponMap.isEmpty()){
+            return Collections.emptyList();
+        }
+
+        // 3.2.仅保留单券方案（删除多券排列组合）
+        availableCoupons = new ArrayList<>(availableCouponMap.keySet());
+        List<List<Coupons>> solutions = new ArrayList<>();
+        // 只添加单券方案，不生成任何组合
+        for (Coupons c : availableCoupons) {
+            solutions.add(List.of(c));
+        }
+
+        // 4.计算方案的优惠明细
+        List<CouponDiscountDTO> list =
+                Collections.synchronizedList(new ArrayList<>(solutions.size()));
+        for (List<Coupons> solution : solutions) {
+            list.add(calculateSolutionDiscount(availableCouponMap, orderProducts, solution));
+        }
+
+        // 5.筛选最优解
+        return findBestSolution(list);
+    }
+
+
+    private List<CouponDiscountDTO> findBestSolution(List<CouponDiscountDTO> list) {
+        // 1.准备Map记录最优解
+        Map<String, CouponDiscountDTO> moreDiscountMap = new HashMap<>();
+        Map<Integer, CouponDiscountDTO> lessCouponMap = new HashMap<>();
+        // 2.遍历，筛选最优解
+        for (CouponDiscountDTO solution : list) {
+            // 2.1.计算当前方案的id组合
+            String ids = solution.getIds().stream()
+                    .sorted(Long::compare).map(String::valueOf).collect(Collectors.joining(","));
+            // 2.2.比较用券相同时，优惠金额是否最大
+            CouponDiscountDTO best = moreDiscountMap.get(ids);
+            if (best != null && best.getDiscountAmount() >= solution.getDiscountAmount()) {
+                // 当前方案优惠金额少，跳过
+                continue;
+            }
+            // 2.3.比较金额相同时，用券数量是否最少
+            best = lessCouponMap.get(solution.getDiscountAmount());
+            int size = solution.getIds().size();
+            if (size > 1 && best != null && best.getIds().size() <= size) {
+                // 当前方案用券更多，放弃
+                continue;
+            }
+            // 2.4.更新最优解
+            moreDiscountMap.put(ids, solution);
+            lessCouponMap.put(solution.getDiscountAmount(), solution);
+        }
+        // 3.求交集
+        Collection<CouponDiscountDTO> moreDiscounts = moreDiscountMap.values();
+        Collection<CouponDiscountDTO> lessCoupons = lessCouponMap.values();
+
+        Collection<CouponDiscountDTO> bestSolutions = moreDiscounts.stream()
+                .filter(lessCoupons::contains)
+                .collect(Collectors.toList());
+
+        // 4.排序，按优惠金额降序
+        return bestSolutions.stream()
+                .sorted(Comparator.comparingInt(CouponDiscountDTO::getDiscountAmount).reversed())
+                .collect(Collectors.toList());
+    }
+
+    private CouponDiscountDTO calculateSolutionDiscount(Map<Coupons, List<OrderProductDTO>> availableCouponMap, List<OrderProductDTO> orderProducts, List<Coupons> solution) {
+            // 1.初始化DTO
+            CouponDiscountDTO dto = new CouponDiscountDTO();
+            // 2.初始化折扣明细的映射
+            Map<Long, Integer> detailMap = orderProducts.stream().collect(Collectors.toMap(OrderProductDTO::getId, oc -> 0));
+            // 3.计算折扣
+            for (Coupons coupon : solution) {
+                // 3.1.获取优惠券限定范围对应的课程
+                List<OrderProductDTO> availableCourses = availableCouponMap.get(coupon);
+                // 3.2.计算课程总价(课程原价 - 折扣明细)
+                int totalAmount = availableCourses.stream()
+                        .mapToInt(oc -> oc.getPrice() - detailMap.get(oc.getId())).sum();
+                // 3.3.判断是否可用
+                Discount discount = DiscountStrategy.getDiscount(DiscountType.of(coupon.getDiscountType()));
+                if (!discount.canUse(totalAmount, coupon)) {
+                    // 券不可用，跳过
+                    continue;
+                }
+                // 3.4.计算优惠金额
+                int discountAmount = discount.calculateDiscount(totalAmount, coupon);
+                // 3.5.计算优惠明细
+                calculateDiscountDetails(detailMap, availableCourses, totalAmount, discountAmount);
+                // 3.6.更新DTO数据
+                dto.getIds().add(coupon.getCreater());
+                dto.getRules().add(discount.getRule(coupon));
+                dto.setDiscountAmount(discountAmount + dto.getDiscountAmount());
+            }
+            return dto;
+    }
+
+    private void calculateDiscountDetails(Map<Long, Integer> detailMap, List<OrderProductDTO> availableCourses, int totalAmount, int discountAmount) {
+        int times = 0;
+        int remainDiscount = discountAmount;
+        for (OrderProductDTO course : availableCourses) {
+            // 更新课程已计算数量
+            times++;
+            int discount = 0;
+            // 判断是否是最后一个课程
+            if (times == availableCourses.size()) {
+                // 是最后一个课程，总折扣金额 - 之前所有商品的折扣金额之和
+                discount = remainDiscount;
+            } else {
+                // 计算折扣明细（课程价格在总价中占的比例，乘以总的折扣）
+                discount = discountAmount * course.getPrice() / totalAmount;
+                remainDiscount -= discount;
+            }
+            // 更新折扣明细
+            detailMap.put(course.getId(), discount + detailMap.get(course.getId()));
+        }
+    }
+
+    private Map<Coupons, List<OrderProductDTO>> findAvailableCoupons(
+            List<Coupons> coupons, List<OrderProductDTO> courses) {
+        Map<Coupons, List<OrderProductDTO>> map = new HashMap<>(coupons.size());
+        for (Coupons coupon : coupons) {
+            // 1.找出优惠券的可用的商品
+            List<OrderProductDTO> availableCourses = courses;
+            if (coupon.getSpecific()) {
+//                // 1.1.限定了范围，查询券的可用范围
+//                List<CouponScope> scopes = scopeService.lambdaQuery().eq(CouponsScope::getCouponId, coupon.getId()).list();
+//                // 1.2.获取范围对应的分类id
+//                Set<Long> scopeIds = scopes.stream().map(CouponScope::getBizId).collect(Collectors.toSet());
+//                // 1.3.筛选课程
+//                availableCourses = courses.stream()
+//                        .filter(c -> scopeIds.contains(c.getCateId())).collect(Collectors.toList());
+            }
+            if(availableCourses.isEmpty()){
+                // 没有任何可用课程，抛弃
+                continue;
+            }
+            // 2.计算商品总价
+            int totalAmount = availableCourses.stream().mapToInt(OrderProductDTO::getPrice).sum();
+            // 3.判断是否可用
+            Discount discount = DiscountStrategy.getDiscount(DiscountType.of(coupon.getDiscountType()));
+            if (discount.canUse(totalAmount, coupon)) {
+                map.put(coupon, availableCourses);
+            }
+        }
+        return map;
+    }
 
 
 }

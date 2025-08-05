@@ -1,7 +1,12 @@
 package com.ljh.fawnhealth.mapper;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ljh.fawnhealth.model.entity.ExchangeCode;
+import org.springframework.data.repository.query.Param;
 
 
 /**

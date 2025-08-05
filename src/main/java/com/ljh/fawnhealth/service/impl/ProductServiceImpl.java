@@ -1,22 +1,30 @@
 package com.ljh.fawnhealth.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
+import com.ljh.fawnhealth.mapper.OrderItemMapper;
 import com.ljh.fawnhealth.mapper.OrderMapper;
 import com.ljh.fawnhealth.mapper.ProductMapper;
 import com.ljh.fawnhealth.model.dto.product.ProductCreateDTO;
 import com.ljh.fawnhealth.model.dto.product.ProductListQueryDTO;
+import com.ljh.fawnhealth.model.dto.product.ProductPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.product.ProductUpdateDTO;
+import com.ljh.fawnhealth.model.entity.OrderItem;
 import com.ljh.fawnhealth.model.entity.Product;
 import com.ljh.fawnhealth.model.entity.ProductCategory;
 import com.ljh.fawnhealth.model.vo.product.ProductVO;
 import com.ljh.fawnhealth.service.ProductService;
+import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -41,6 +49,10 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
 
     @Resource
     private OrderMapper orderMapper;
+
+    @Resource
+    private OrderItemMapper orderItemMapper;
+
 
     /**
      * 管理员创建商品
@@ -441,6 +453,91 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
                     return productVO;
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 分页查询商品列表
+     *
+     * @param queryDTO 查询条件和分页参数
+     * @return 分页结果
+     */
+    @Override
+    public IPage<ProductVO> pageQueryProducts(ProductPageQueryDTO queryDTO) {
+        // 1. 初始化分页对象
+        Page<Product> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
+
+        // 2. 构建查询条件（默认过滤已删除商品）
+        LambdaQueryWrapper<Product> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Product::getIsDelete, 0); // 只查询未删除的商品
+
+        // 3. 动态添加筛选条件
+        if (queryDTO.getId() != null) {
+            queryWrapper.eq(Product::getId, queryDTO.getId()); // 商品ID精确匹配
+        }
+        if (queryDTO.getName() != null && !queryDTO.getName().trim().isEmpty()) {
+            queryWrapper.like(Product::getName, queryDTO.getName().trim()); // 商品名称模糊匹配
+        }
+        if (queryDTO.getStatus() != null) {
+            queryWrapper.eq(Product::getStatus, queryDTO.getStatus()); // 商品状态精确匹配
+        }
+
+        // 4. 按创建时间降序排序（最新的商品在前）
+        queryWrapper.orderByDesc(Product::getCreateTime);
+
+        // 5. 执行分页查询
+        IPage<Product> productPage = productMapper.selectPage(page, queryWrapper);
+
+        // 6. 转换为VO分页对象（实体 -> VO）
+        IPage<ProductVO> productVOPage = new Page<>();
+        productVOPage.setTotal(productPage.getTotal()); // 总条数
+        productVOPage.setPages(productPage.getPages()); // 总页数
+        productVOPage.setCurrent(productPage.getCurrent()); // 当前页码
+        productVOPage.setSize(productPage.getSize()); // 每页条数
+        productVOPage.setRecords(BeanCopyUtils.copyList(productPage.getRecords(), ProductVO.class)); // 商品列表
+
+        return productVOPage;
+    }
+
+    /**
+     * 每分钟执行一次
+     * cron表达式：秒 分 时 日 月 周
+     */
+    @Scheduled(cron = "0 0/1 * * * ?")
+    @Transactional
+    public void updateProductHotStatus() {
+        log.info("开始执行商品热销状态更新定时任务...");
+
+        // 1. 查询所有未删除的商品
+        List<Product> products = productMapper.selectList(
+                new LambdaQueryWrapper<Product>()
+                        .eq(Product::getIsDelete, 0)
+        );
+
+        if (products.isEmpty()) {
+            log.info("没有需要处理的商品，任务结束");
+            return;
+        }
+
+        for (Product product : products) {
+            // 传递商品ID和isDelete=0，调用sumQuantity
+            Integer totalSales = orderItemMapper.sumQuantity(product.getId(), 0);
+
+            // 处理可能的 null（确保返回0）
+            totalSales = totalSales == null ? 0 : totalSales;
+
+            boolean isHot = totalSales >= 10;
+
+            // 状态变化时才更新
+            if (isHot != (product.getIsHot() == 1)) {
+                product.setIsHot(isHot ? 1 : 0);
+                product.setIsRecommend(isHot ? 1 : 0);
+                productMapper.updateById(product);
+                log.info("商品ID: {}, 名称: {} 销量: {}，已{}为热销和推荐商品",
+                        product.getId(), product.getName(), totalSales, isHot ? "标记" : "取消标记");
+            }
+        }
+
+        log.info("商品热销状态更新定时任务执行完成");
     }
 
     /**

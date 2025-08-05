@@ -83,6 +83,46 @@ public class OrderVO {
     private String note;
 
     /**
+     * 物流公司
+     */
+    private String deliveryCompany;
+
+    /**
+     * 物流单号
+     */
+    private String deliveryNo;
+
+    /**
+     * 发货时间
+     */
+    private Date deliveryTime;
+
+    /**
+     * 退款金额
+     */
+    private BigDecimal refundAmount;
+
+    /**
+     * 退款原因
+     */
+    private String refundReason;
+
+    /**
+     * 退款时间
+     */
+    private Date refundTime;
+
+    /**
+     * 退款状态：0-未退款，1-退款中，2-已退款，3-退款失败
+     */
+    private Integer refundStatus;
+
+    /**
+     * 驳回原因
+     */
+    private String refundRejectReason;
+
+    /**
      * 创建时间
      */
     private Date createTime;

@@ -38,7 +38,7 @@ public class CouponsFormDTO {
     /**
      * 优惠券类型，1：每满减，2：折扣，3：无门槛，4：普通满减
      */
-    private DiscountType discountType;
+    private Integer discountType;
 
     /**
      * 折扣门槛，0代表无门槛
@@ -68,6 +68,6 @@ public class CouponsFormDTO {
     /**
      * 获取方式  1：手动领取，2：指定发放（通过兑换码兑换）
      */
-    private ObtainType obtainWay;
+    private Integer obtainWay;
 
 }

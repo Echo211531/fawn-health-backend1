@@ -411,7 +411,7 @@ CREATE TABLE `order` (
                          `payment_type` tinyint COMMENT '支付方式：1-支付宝，2-微信，3-银联',
                          `payment_time` datetime COMMENT '支付时间',
                          `payment_serial_number` varchar(100) COMMENT '支付流水号',
-                         `status` tinyint NOT NULL DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付待发货，2-已发货，3-已完成，4-已取消，5-已退款，6-已关闭',
+                         `status` tinyint NOT NULL DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付待发货，2-已发货，3-已完成，4-已取消，5-已退款，6-已关闭，7-退款中, 8-已拒绝',
                          `delivery_company` varchar(50) COMMENT '物流公司',
                          `delivery_no` varchar(50) COMMENT '物流单号',
                          `delivery_time` datetime COMMENT '发货时间',
@@ -511,3 +511,16 @@ CREATE TABLE `refund_application` (
 ALTER TABLE `order`
     ADD COLUMN `address_id` bigint COMMENT '收货地址ID（关联shipping_address表的id）'
         AFTER `coupon_id`;
+
+ALTER TABLE `coupons`
+    ADD COLUMN `is_delete` tinyint NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是' AFTER `update_time`,
+    ADD COLUMN `creater` bigint COMMENT '创建人（用户ID）' AFTER `is_delete`;
+
+ALTER TABLE `order`
+    ADD COLUMN `refund_amount` decimal(10,2) DEFAULT 0 COMMENT '退款金额',
+    ADD COLUMN `refund_reason` varchar(500) COMMENT '退款原因',
+    ADD COLUMN `refund_time` datetime COMMENT '退款时间',
+    ADD COLUMN `refund_status` tinyint DEFAULT 0 COMMENT '退款状态：0-未退款，1-退款中，2-已退款，3-退款失败';
+
+ALTER TABLE `order`
+    ADD COLUMN `refund_reject_reason` varchar(500) COMMENT '退款驳回原因：审核驳回时记录具体原因';

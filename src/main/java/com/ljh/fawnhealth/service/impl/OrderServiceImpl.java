@@ -10,11 +10,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.*;
-import com.ljh.fawnhealth.model.dto.order.OrderCreateDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderItemDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderPageQueryDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderStatusUpdateDTO;
+import com.ljh.fawnhealth.model.dto.order.*;
 import com.ljh.fawnhealth.model.entity.*;
+import com.ljh.fawnhealth.model.enums.coupons.UserCouponStatus;
 import com.ljh.fawnhealth.model.enums.order.StatisticDimension;
 import com.ljh.fawnhealth.model.vo.address.AddressVO;
 import com.ljh.fawnhealth.model.vo.order.*;
@@ -61,6 +59,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
     @Resource
     private ProductMapper productMapper;
 
+    @Resource
+    private UserCouponMapper userCouponsMapper;
+
     @Override
     public Order getOrder(Long orderId) {
         return orderMapper.selectById(orderId);
@@ -100,44 +101,34 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "无权使用该收货地址");
         }
 
-        // 3. 生成订单编号（规则：时间戳+随机数，使用JDK自带类）
-        // 生成时间戳部分（年月日时分秒，14位，如20250725201030）
+        // 3. 生成订单编号
         String timePart = LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-
-        // 生成随机数部分（4位，0000-9999，使用Random）
         String randomPart = String.format("%04d", new Random().nextInt(10000));
-
-        // 拼接为订单编号（14+4=18位，如202507252010305678）
         String orderNo = timePart + randomPart;
 
         // 4. 处理订单项，计算总金额并校验商品合法性
         List<OrderItemDTO> itemDTOList = orderCreateDTO.getOrderItems();
         List<OrderItem> orderItems = new ArrayList<>();
-        BigDecimal totalAmount = BigDecimal.ZERO; // 订单总金额（商品总价之和）
+        BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (OrderItemDTO itemDTO : itemDTOList) {
-            // 4.1 校验商品是否存在（假设商品表为product）
             Product product = productMapper.selectById(itemDTO.getProductId());
             if (product == null || product.getIsDelete() == 1) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品不存在：" + itemDTO.getProductId());
             }
 
-            // 4.2 校验商品单价（防止前端篡改价格）
             if (itemDTO.getCurrentPrice().compareTo(product.getPrice()) != 0) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品价格异常：" + product.getName());
             }
 
-            // 4.3 校验库存（假设商品表有stock字段）
             if (product.getStock() < itemDTO.getQuantity()) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品库存不足：" + product.getName());
             }
 
-            // 4.4 计算订单项总价（单价×数量）
             BigDecimal itemTotal = itemDTO.getCurrentPrice().multiply(new BigDecimal(itemDTO.getQuantity()));
             totalAmount = totalAmount.add(itemTotal);
 
-            // 4.5 构建订单项实体
             OrderItem orderItem = new OrderItem();
             orderItem.setOrderNo(orderNo);
             orderItem.setProductId(itemDTO.getProductId());
@@ -149,17 +140,16 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
             orderItem.setSpecs(itemDTO.getSpecs());
             orderItems.add(orderItem);
 
-            // 4.6 扣减商品库存（实际项目可能需要加锁防止超卖）
             product.setStock(product.getStock() - itemDTO.getQuantity());
             productMapper.updateById(product);
         }
 
-        // 5. 计算订单金额（总金额+运费-优惠等）
-        BigDecimal freightAmount = calculateFreight(orderItems); // 计算运费（示例：满99免运费）
-        BigDecimal discountAmount = calculateDiscount(orderCreateDTO.getCouponId(), totalAmount); // 计算优惠
+        // 5. 计算订单金额
+        BigDecimal freightAmount = calculateFreight(orderItems);
+        BigDecimal discountAmount = calculateDiscount(orderCreateDTO.getCouponId(), totalAmount);
         BigDecimal paymentAmount = totalAmount.add(freightAmount).subtract(discountAmount);
         if (paymentAmount.compareTo(BigDecimal.ZERO) < 0) {
-            paymentAmount = BigDecimal.ZERO; // 防止金额为负数
+            paymentAmount = BigDecimal.ZERO;
         }
 
         // 6. 保存订单主表
@@ -171,27 +161,65 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
         order.setFreightAmount(freightAmount);
         order.setDiscountAmount(discountAmount);
         order.setPaymentType(orderCreateDTO.getPaymentType());
-        order.setStatus(0); // 初始状态：待支付
+        order.setStatus(0);
         order.setNote(orderCreateDTO.getNote());
         order.setSource(orderCreateDTO.getSource());
-        order.setCouponId(orderCreateDTO.getCouponId());
+        order.setCouponId(orderCreateDTO.getCouponId()); // 这里存储的是user_coupons表的主键ID
         order.setCreateTime(new Date());
         order.setAddressId(orderCreateDTO.getAddressId());
         order.setUpdateTime(new Date());
         orderMapper.insert(order);
 
-        // 7. 保存订单项（关联订单ID）
+        // 7. 保存订单项
         for (OrderItem item : orderItems) {
             item.setOrderId(order.getId());
             orderItemMapper.insert(item);
         }
 
-        // 8. 记录订单操作日志（创建订单）
+        // 处理优惠券使用状态（关键修改部分）
+        Long userCouponId = orderCreateDTO.getCouponId(); // 明确这是user_coupons表的主键ID
+        if (userCouponId != null) {
+            // 1. 根据主键ID查询用户优惠券记录
+            UserCoupon userCoupon = userCouponsMapper.selectById(userCouponId);
+
+            // 2. 验证优惠券是否存在且属于当前用户
+            if (userCoupon == null) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "优惠券不存在");
+            }
+            if (!userCoupon.getUserId().equals(userId)) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "无权使用该优惠券");
+            }
+            if (userCoupon.getStatus() != UserCouponStatus.UNUSED) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "优惠券已使用或已过期");
+            }
+
+            // 3. 检查优惠券是否已过期
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime termBegin = LocalDateTime.ofInstant(userCoupon.getTermBeginTime().toInstant(), ZoneId.systemDefault());
+            LocalDateTime termEnd = LocalDateTime.ofInstant(userCoupon.getTermEndTime().toInstant(), ZoneId.systemDefault());
+            if (now.isBefore(termBegin) || now.isAfter(termEnd)) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "优惠券不在有效期内");
+            }
+
+            // 4. 更新优惠券状态为“已使用”
+            UserCoupon updateCoupon = new UserCoupon();
+            updateCoupon.setId(userCouponId);
+            updateCoupon.setStatus(UserCouponStatus.USED); // 1-已使用
+            updateCoupon.setUsedTime(new Date());
+            updateCoupon.setUpdateTime(new Date());
+
+            int updateCount = userCouponsMapper.updateById(updateCoupon);
+            if (updateCount == 0) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "优惠券使用失败，请重试");
+            }
+        }
+
+        // 8. 记录订单操作日志
         OrderOperationLog log = new OrderOperationLog();
         log.setOrderId(order.getId());
         log.setOrderNo(orderNo);
-        log.setOperator(userId.toString()); // 操作人：当前用户ID
-        log.setOperationType(1); // 1-创建订单
+        log.setOperator(userId.toString());
+        log.setOperationType(1);
         log.setOperationNote("用户创建订单");
         orderOperationLogMapper.insert(log);
 
@@ -860,6 +888,118 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
 
         // 9. 返回更新后的订单详情VO
         return getOrderDetailById(orderId);
+    }
+
+    /**
+     * 用户确认订单收货
+     * 更新订单确认状态为“已确认”，记录收货时间，同时将订单状态更新为“已完成”
+     *
+     * @param confirmReceiveDTO 确认收货参数（包含订单ID）
+     * @return 更新后的订单信息
+     */
+    @Override
+    public OrderVO confirmOrderReceive(OrderConfirmReceiveDTO confirmReceiveDTO) {
+        Long orderId = confirmReceiveDTO.getOrderId();
+        // 1. 查询订单是否存在
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "订单不存在");
+        }
+        // 2. 校验订单状态：只有“已发货”（status=2）的订单可确认收货
+        if (order.getStatus()!= 2) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前订单状态无法确认收货，仅已发货订单可操作");
+        }
+
+        // 4. 更新订单信息
+        order.setConfirmStatus(1); // 确认收货状态：已确认
+        order.setReceiveTime(new Date()); // 记录收货时间
+        order.setStatus(3); // 订单状态更新为“已完成”
+        order.setUpdateTime(new Date());
+        orderMapper.updateById(order);
+        // 5. 转换为VO返回
+        return convertToOrderVO(order);
+    }
+
+    /**
+     * 用户申请订单退款
+     * 验证订单状态后，更新订单为“已退款”状态，记录退款信息
+     *
+     * @param refundDTO 退款申请参数（订单ID、退款原因等）
+     * @return 更新后的订单信息
+     */
+    public OrderVO applyOrderRefund(OrderRefundDTO refundDTO) {
+        Long orderId = refundDTO.getOrderId();
+        // 1. 查询订单是否存在
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "订单不存在");
+        }
+
+        // 3. 校验订单状态（仅允许特定状态申请退款）
+        List<Integer> allowStatus = Arrays.asList(1, 2, 3); // 已支付待发货、已发货、已完成
+        if (!allowStatus.contains(order.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前订单状态不支持退款申请");
+        }
+        // 4. 校验退款金额（默认全额退款，若指定金额需≤实付金额）
+        BigDecimal refundAmount = refundDTO.getRefundAmount();
+        if (refundAmount == null) {
+            refundAmount = order.getPaymentAmount(); // 全额退款
+        } else if (refundAmount.compareTo(order.getPaymentAmount()) > 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"退款金额不能超过实付金额");
+        }
+        // 5. 更新订单信息
+        order.setStatus(7); // 订单状态：退款中
+        order.setRefundStatus(1);
+        order.setRefundAmount(refundAmount); // 记录退款金额
+        order.setRefundReason(refundDTO.getRefundReason()); // 记录退款原因
+        order.setRefundTime(new Date()); // 记录退款时间
+        order.setUpdateTime(new Date());
+        orderMapper.updateById(order);
+        // 6. 转换为VO返回
+        return convertToOrderVO(order);
+    }
+
+    /**
+     * 管理员审核退款申请
+     *
+     * @param auditDTO 审核参数（订单ID、审核结果、备注）
+     * @return 更新后的订单信息
+     */
+    public OrderVO auditRefund(OrderRefundAuditDTO auditDTO) {
+        Long orderId = auditDTO.getOrderId();
+        Integer auditResult = auditDTO.getAuditResult(); // 1-通过，2-驳回
+
+        // 1. 查询订单
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "订单不存在");
+        }
+
+        // 3. 处理审核结果
+        Date now = new Date();
+        if (auditResult == 1) {
+            // 3.1 审核通过：更新为“已退款”
+            order.setStatus(5); // 订单状态：5-已退款
+            order.setRefundStatus(2); // 退款状态：2-已退款
+            order.setRefundTime(now); // 记录退款完成时间
+            order.setUpdateTime(now);
+        } else if (auditResult == 2) {
+            // 3.2 审核驳回：更新为“退款失败”
+            if (auditDTO.getAuditRemark() == null || auditDTO.getAuditRemark().trim().isEmpty()) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "驳回退款需填写原因");
+            }
+            order.setRefundStatus(3); // 退款状态：3-退款失败
+            order.setStatus(8); // 已拒绝
+            order.setRefundRejectReason("（驳回原因：" + auditDTO.getAuditRemark() + "）");
+            order.setUpdateTime(now);
+
+        } else {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "审核结果无效（1-通过，2-驳回）");
+        }
+
+        // 4. 保存更新
+        orderMapper.updateById(order);
+        return convertToOrderVO(order);
     }
 
     /**

@@ -2,6 +2,9 @@ package com.ljh.fawnhealth.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.entity.Cart;
+import com.ljh.fawnhealth.model.vo.product.CartVO;
+
+import java.util.List;
 
 
 /**
@@ -11,4 +14,27 @@ import com.ljh.fawnhealth.model.entity.Cart;
 */
 public interface CartService extends IService<Cart> {
 
+    /**
+     * 添加商品到购物车
+     * @param userId 用户ID
+     * @param productId 商品ID
+     * @param quantity 数量
+     */
+    void addToCart(Long userId, Long productId, Integer quantity);
+
+    /**
+     * 从购物车移除商品
+     *
+     * @param userId 用户ID
+     * @param productId 商品ID
+     */
+    void removeFromCart(Long userId, Long productId);
+
+    /**
+     * 查询用户购物车列表（包含商品详情）
+     *
+     * @param userId 用户ID
+     * @return 购物车列表（包含商品信息）
+     */
+    List<CartVO> getUserCartList(Long userId);
 }

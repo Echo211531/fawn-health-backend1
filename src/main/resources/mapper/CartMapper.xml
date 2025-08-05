@@ -21,4 +21,13 @@
         quantity,selected,specs,
         create_time,update_time,is_delete
     </sql>
+    <!-- 根据用户ID和商品ID查询购物车记录 -->
+    <select id="selectByUserIdAndProductId" resultType="com.ljh.fawnhealth.model.entity.Cart">
+        SELECT id, user_id, product_id, quantity, selected,
+               specs, create_time, update_time, is_delete
+        FROM cart
+        WHERE user_id = #{userId}
+          AND product_id = #{productId}
+          AND is_delete = 0
+    </select>
 </mapper>

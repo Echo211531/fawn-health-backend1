@@ -41,7 +41,10 @@ public class FoodCategoriesServiceImpl extends ServiceImpl<FoodCategoriesMapper,
         List<FoodCategories> entityList = foodCategoriesMapper.selectList(
                 new QueryWrapper<FoodCategories>()
                         .lambda()
-                        .orderByAsc(FoodCategories::getSortOrder)
+                        // 核心：添加过滤条件
+                        .eq(FoodCategories::getIsDelete, 0)  // 排除已删除的分类
+                        .eq(FoodCategories::getStatus, 1)    // 排除禁用的分类（只保留启用状态）
+                        .orderByAsc(FoodCategories::getSortOrder)  // 按排序权重升序
         );
 
         return BeanCopyUtils.copyList(entityList, FoodCategoryVO.class);

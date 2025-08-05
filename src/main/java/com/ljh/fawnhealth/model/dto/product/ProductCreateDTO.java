@@ -62,4 +62,14 @@ public class ProductCreateDTO {
      * 商品重量(g)
      */
     private BigDecimal weight;
+
+    /**
+     * 是否热销：0-否，1-是
+     */
+    private Integer isHot;
+
+    /**
+     * 是否推荐：0-否，1-是
+     */
+    private Integer isRecommend;
 }

@@ -1,16 +1,21 @@
 package com.ljh.fawnhealth.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.plugins.pagination.PageDTO;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.model.dto.coupons.CouponsFormDTO;
 import com.ljh.fawnhealth.model.dto.coupons.CouponsIssueFormDTO;
+import com.ljh.fawnhealth.model.dto.coupons.CouponsSearchDTO;
+import com.ljh.fawnhealth.model.dto.coupons.ExchangeCodeQueryDTO;
 import com.ljh.fawnhealth.model.query.coupons.CouponsQuery;
 import com.ljh.fawnhealth.model.vo.coupons.CouponsDetailVO;
 import com.ljh.fawnhealth.model.vo.coupons.CouponsPageVO;
 import com.ljh.fawnhealth.model.vo.coupons.CouponsVO;
+import com.ljh.fawnhealth.model.vo.coupons.ExchangeCodeVO;
 import com.ljh.fawnhealth.service.CouponsService;
+import com.ljh.fawnhealth.service.ExchangeCodeService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +32,9 @@ public class CouponsController {
 
     @Resource
     private CouponsService couponsService;
+
+    @Resource
+    private ExchangeCodeService exchangeCodeService;
 
     /**
      * 新增优惠券
@@ -128,5 +136,41 @@ public class CouponsController {
     public BaseResponse<String> pauseIssue(Long couponsId) { // 补充@RequestParam注解
         couponsService.pauseIssue(couponsId);
         return ResultUtils.success("暂停发放优惠券");
+    }
+
+    /**
+     * 多条件分页查询优惠券
+     * 支持按类型、状态和名称搜索
+     *
+     * @param queryDTO 包含查询条件和分页参数的DTO
+     * @return 分页查询结果
+     */
+    @PostMapping("/search")
+    public BaseResponse<PageDTO<CouponsPageVO>> searchCoupons(@RequestBody CouponsSearchDTO queryDTO) {
+        log.info("多条件查询优惠券，参数：{}", queryDTO);
+
+        // 校验分页参数
+        if (queryDTO.getPageNum() < 1) {
+            queryDTO.setPageNum(1);
+        }
+        if (queryDTO.getPageSize() < 1 || queryDTO.getPageSize() > 100) {
+            queryDTO.setPageSize(10);
+        }
+
+        PageDTO<CouponsPageVO> pageResult = couponsService.searchCoupons(queryDTO);
+        return ResultUtils.success(pageResult);
+    }
+
+
+    /**
+     * 分页查询兑换码
+     *
+     * @param queryDTO
+     * @return
+     */
+    @PostMapping("/ExchangeCodepage")
+    public BaseResponse<PageDTO<ExchangeCodeVO>> queryExchangeCodePage(@RequestBody ExchangeCodeQueryDTO queryDTO) {
+        PageDTO<ExchangeCodeVO> page = exchangeCodeService.queryExchangeCodePage(queryDTO);
+        return ResultUtils.success(page);
     }
 }

@@ -28,11 +28,12 @@
             <result property="description" column="description" jdbcType="VARCHAR"/>
             <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+            <result property="creater" column="creater" jdbcType="BIGINT"/>
             <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,name,type,
+        id,name,type,creater
         discount_type,specific,discount_value,
         threshold_amount,max_discount_amount,obtain_way,
         issue_begin_time,issue_end_time,term_days,
