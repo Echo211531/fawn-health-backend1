@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.tool.ToolCallback;
@@ -24,6 +24,9 @@ public class ToolRegistration {
     QueryUserTool queryUserTool;
     @Resource
     SaveAsMarkdownTool saveAsMarkdownTool;
+    @Resource
+    UserInteractionTool userInteractionTool;
+
     /**
      * 注册所有AI工具
      */
@@ -33,15 +36,16 @@ public class ToolRegistration {
         return ToolCallbacks.from(
                 dietTool,
                 zhipuWebSearchTool,
-               // queryUserTool,
+                queryUserTool,
                 saveAsMarkdownTool,
                 new WebScrapingTool(),
                 fileOperationTool,
-               // databaseOperationTool,
+                databaseOperationTool,
                 new ResourceDownloadTool(),
                 new PDFGenerationTool(),
                 new DateTimeTool(),
                 new TerminateTool()
+        // userInteractionTool
         );
     }
 }

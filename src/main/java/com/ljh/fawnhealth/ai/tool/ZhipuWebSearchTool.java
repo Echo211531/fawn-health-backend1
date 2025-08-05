@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;

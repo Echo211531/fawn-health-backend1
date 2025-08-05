@@ -1,7 +1,6 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.stereotype.Component;
 
 //终止工具（让智能体自主合理中断）
 public class TerminateTool {

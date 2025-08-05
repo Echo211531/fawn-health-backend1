@@ -1,17 +1,11 @@
 package com.ljh.fawnhealth.ai.agent;
 
-import com.ljh.fawnhealth.ai.agent.model.AgentState;
-import com.ljh.fawnhealth.ai.agent.model.StreamEventType;
+import com.ljh.fawnhealth.ai.model.AgentState;
+import com.ljh.fawnhealth.ai.model.StreamEventType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.MessageType;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.Map;
 
 /**
  * ReAct (Reasoning and Acting) 模式的代理抽象类  
@@ -60,26 +54,4 @@ public abstract class ReActAgent extends BaseAgent {
      */  
     public abstract String act(SseEmitter emitter);
 
-    /**
-     * 执行单个步骤：思考和行动
-     *
-     * @return 步骤执行结果
-     */
-    @Override
-    public String step() {
-        try {
-            // 1. 构建 SSE 事件
-            SseEmitter emitter = new SseEmitter();
-            sendStreamEvent(emitter, StreamEventType.THINKING, "思考中...");
-            boolean shouldAct = think(emitter);
-            if (!shouldAct) {
-                return "思考完成 - 无需行动";
-            }
-            return act(emitter);
-        } catch (Exception e) {
-            // 记录异常日志
-            e.printStackTrace();
-            return "步骤执行失败: " + e.getMessage();
-        }
-    }
 }

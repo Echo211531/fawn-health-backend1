@@ -1,11 +1,10 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import org.jsoup.Jsoup;
 
 import org.jsoup.nodes.Document;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Component;
 
 /**
  * 网页抓取工具类

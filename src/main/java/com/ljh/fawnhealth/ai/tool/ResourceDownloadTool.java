@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
 import com.ljh.fawnhealth.constant.FileConstant;

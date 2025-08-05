@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;

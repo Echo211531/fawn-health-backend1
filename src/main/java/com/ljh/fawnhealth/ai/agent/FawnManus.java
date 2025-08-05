@@ -3,7 +3,10 @@ package com.ljh.fawnhealth.ai.agent;
 import com.ljh.fawnhealth.ai.advisor.MyLoggerAdvisor;
 import com.ljh.fawnhealth.ai.advisor.ProhibitedWordAdvisor;
 import com.ljh.fawnhealth.ai.advisor.ReReadingAdvisor;
+import com.ljh.fawnhealth.ai.context.AgentContext;
+import com.ljh.fawnhealth.ai.prompt.ToolCallPrompt;
 import com.ljh.fawnhealth.ai.store.MongoChatMemory;
+import com.ljh.fawnhealth.ai.tool.collection.ToolCollection;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -12,53 +15,54 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-@Component
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+
 public class FawnManus extends ToolCallAgent {
-    private final MongoChatMemory mongoChatMemory;
-    @Autowired
-    public FawnManus(ToolCallback[] allTools, ChatModel dashscopeChatModel,
-                     MongoChatMemory mongoChatMemory) {
-        super(allTools, null);  // chatId 留空，后续设置
-        this.mongoChatMemory = mongoChatMemory;
-        init(dashscopeChatModel);
-    }
-    // 允许运行时设置 chatId（直接设置父类的protected字段）
-    public void setChatId(String chatId) {
-        this.chatId = chatId;
-    }
+        private final MongoChatMemory mongoChatMemory;
 
-    private void init(ChatModel dashscopeChatModel) {
-        this.setName("fawnManus");
-        String SYSTEM_PROMPT = """  
-            你是一个全能的人工智能助手，你可以调用各种工具来完成用户给你的任务。
-            接收到用户的任务，你需要根据用户提出的要求，分析出完成用户的步骤所需的流程，以第一步、第二步..的方式来逐步完成用户的需求。不要向用户询问提供额外信息。
-            为完成用户的需求，你可以调用提供的工具，但是需要在有正确的（非报错或没有找到）结果之后，能够进行下一步操作，减少重复调用工具的行为，以浪费系统资源。
-            如果执行任务产生报错或者搜索失败，请务必再次尝试，可以切换搜索关键词，这有利于提升用户体验
-        """;
+        /**
+         * 使用AgentContext构造
+         */
+        public FawnManus(AgentContext context, ChatModel dashscopeChatModel,
+                        MongoChatMemory mongoChatMemory) {
+                super(context);
+                this.mongoChatMemory = mongoChatMemory;
+                init(dashscopeChatModel);
+        }
 
-        this.setSystemPrompt(SYSTEM_PROMPT);
-        String NEXT_STEP_PROMPT = """  
-          根据用户需求，主动选择最合适的工具或工具组合。对于复杂的任务，您可以分解问题并逐步使用不同的工具来解决它。
-          使用每个工具后，清楚地解释执行结果并建议后续步骤。
-          如果执行任务产生报错，请再次尝试，这有利于提升用户体验
-          如果要在任何时候停止交互，请使用 'terminate' 工具调用，但是调用之前，确保完成任务的最后一步，不要没有完成任务提前退出
-          """;
+        private void init(ChatModel dashscopeChatModel) {
+                // 设置智能体名称为"小鹿"，这会在ToolCallAgent的initPromptsWithContext中被使用
+                this.setName("小鹿");
+                this.setMaxSteps(10); // 增加最大步数，支持更复杂的任务
+                // 初始化超级智能体客户端
+                ChatClient chatClient = ChatClient.builder(dashscopeChatModel)
+                                .defaultAdvisors(
+                                                new MessageChatMemoryAdvisor(mongoChatMemory), // 对话记忆
+                                                new MyLoggerAdvisor()// 自定义日志
+                                // 自定义违禁词 Advisor，可按需开启
+                                // new ProhibitedWordAdvisor()
+                                // 自定义推理增强，可按需开启
+                                // new ReReadingAdvisor()
+                                )
+                                .build();
+                this.setChatClient(chatClient);
+        }
 
-        this.setNextStepPrompt(NEXT_STEP_PROMPT);
-        this.setMaxSteps(10);
-
-        // 初始化超级智能体客户端
-        ChatClient chatClient = ChatClient.builder(dashscopeChatModel)
-                .defaultAdvisors(
-                        new MessageChatMemoryAdvisor(mongoChatMemory), //对话记忆
-                        new MyLoggerAdvisor() //自定义日志
-                        // 自定义违禁词 Advisor，可按需开启
-                        //new ProhibitedWordAdvisor()
-                        //自定义推理增强，可按需开启
-                        //new ReReadingAdvisor()
-                )
-
-                .build();
-        this.setChatClient(chatClient);
-    }
+        /**
+         * 创建AgentContext
+         */
+        public static AgentContext createContext(String query, String chatId, ToolCollection toolCollection) {
+                String requestId = UUID.randomUUID().toString();
+                String dateInfo = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                return AgentContext.builder()
+                                .requestId(requestId)
+                                .chatId(chatId)
+                                .query(query)
+                                .toolCollection(toolCollection)
+                                .dateInfo(dateInfo)
+                                .isStream(true)
+                                .build();
+        }
 }

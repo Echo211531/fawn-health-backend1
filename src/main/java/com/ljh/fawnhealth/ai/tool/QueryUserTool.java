@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import com.ljh.fawnhealth.ai.agent.queue.UserInputQueue;
 import jakarta.annotation.Resource;

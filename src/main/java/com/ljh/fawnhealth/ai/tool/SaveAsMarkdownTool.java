@@ -1,4 +1,4 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 
 import com.ljh.fawnhealth.constant.FileConstant;
 import org.springframework.ai.tool.annotation.Tool;

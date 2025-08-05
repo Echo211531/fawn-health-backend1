@@ -1,20 +1,17 @@
-package com.ljh.fawnhealth.ai.tools;
+package com.ljh.fawnhealth.ai.tool;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.model.dto.food.DietFoodItemDTO;
 import com.ljh.fawnhealth.model.dto.food.DietRecordAddDTO;
 import com.ljh.fawnhealth.model.entity.FoodLibrary;
-import com.ljh.fawnhealth.model.entity.User;
 import com.ljh.fawnhealth.service.DietRecordsService;
 import com.ljh.fawnhealth.service.FoodLibraryService;
 import com.ljh.fawnhealth.service.UserService;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
