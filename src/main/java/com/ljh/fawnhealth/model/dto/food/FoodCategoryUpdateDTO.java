@@ -24,6 +24,11 @@ public class FoodCategoryUpdateDTO {
     private String icon;
 
     /**
+     * 状态：0-禁用，1-启用
+     */
+    private Integer status;
+
+    /**
      * 分类描述
      */
     private String description;
