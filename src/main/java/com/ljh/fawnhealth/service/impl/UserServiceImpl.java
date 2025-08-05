@@ -13,6 +13,7 @@ import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
 import com.ljh.fawnhealth.mapper.UserMapper;
 import com.ljh.fawnhealth.model.dto.user.AdminAddDTO;
+import com.ljh.fawnhealth.model.dto.user.AdminUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.UserPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
@@ -34,6 +35,7 @@ import org.springframework.util.DigestUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -822,6 +824,91 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (insert != 1) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "管理员账号创建失败");
         }
+    }
+
+    /**
+     * 管理员修改个人信息接口
+     *
+     * @param adminId        管理员ID（路径参数，用于定位修改对象）
+     * @param adminUpdateDTO 管理员信息更新参数
+     * @return 更新后的管理员信息
+     */
+    @Override
+    public User updateAdminInfo(Long adminId, AdminUpdateDTO adminUpdateDTO) {
+        // 1. 基础校验：ID合法性
+        if (adminId == null || adminId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "管理员ID无效");
+        }
+
+        // 2. 校验管理员是否存在
+        User admin = this.getById(adminId);
+        if (admin == null) {
+            throw new BusinessException(ErrorCode.USER_NOTFOUND, "管理员不存在");
+        }
+
+        // 3. 权限校验：是否为管理员角色
+        if (!"admin".equals(admin.getRole()) && !"super_admin".equals(admin.getRole())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前账号无管理员权限");
+        }
+
+        // 4. 字段校验与赋值
+        // 4.1 昵称校验（1-50字符）
+        if (adminUpdateDTO.getNickname() != null) {
+            String nickname = adminUpdateDTO.getNickname().trim();
+            if (nickname.isEmpty() || nickname.length() > 50) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "昵称长度必须为1-50字符");
+            }
+            admin.setNickname(nickname);
+        }
+
+        // 4.2 头像URL校验（非空时校验格式）
+        if (adminUpdateDTO.getAvatar() != null) {
+            String avatar = adminUpdateDTO.getAvatar().trim();
+            if (!avatar.isEmpty()
+                    && !avatar.startsWith("http://")
+                    && !avatar.startsWith("https://")) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "头像URL格式必须以http://或https://开头");
+            }
+            admin.setAvatar(avatar);
+        }
+
+        // 4.3 性别校验（必须为0/1/2）
+        if (adminUpdateDTO.getGender() != null) {
+            if (adminUpdateDTO.getGender() < 0 || adminUpdateDTO.getGender() > 2) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "性别必须为0（未知）、1（男）、2（女）");
+            }
+            admin.setGender(adminUpdateDTO.getGender());
+        }
+
+        admin.setBirthday(adminUpdateDTO.getBirthday());
+
+        // 4.4 用户名校验（4-20位字母数字）
+        if (adminUpdateDTO.getUsername() != null) {
+            String username = adminUpdateDTO.getUsername().trim();
+            if (username.isEmpty() || username.length() < 4 || username.length() > 20) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名长度必须为4-20字符");
+            }
+            if (!username.matches("^[a-zA-Z0-9]+$")) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名只能包含字母和数字");
+            }
+            // 额外校验用户名唯一性（避免重复）
+            LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(User::getUserName, username)
+                    .ne(User::getId, adminId); // 排除当前管理员自身
+            if (this.count(queryWrapper) > 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名已被占用");
+            }
+            admin.setUserName(username);
+        }
+
+        // 5. 执行更新
+        boolean updateSuccess = this.updateById(admin);
+        if (!updateSuccess) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "修改个人信息失败，请重试");
+        }
+
+        // 6. 返回更新后的管理员信息
+        return this.getById(adminId);
     }
 
     /**

@@ -305,4 +305,22 @@ public class UserController {
         return ResultUtils.success("管理员账号创建成功，默认密码：123456");
     }
 
+    /**
+     * 管理员修改个人信息接口
+     *
+     * @param adminId 管理员ID（路径参数，用于定位修改对象）
+     * @param adminUpdateDTO 管理员信息更新参数
+     * @return 更新后的管理员信息
+     */
+    @PostMapping("/admin/updateInfo/{adminId}")
+    public BaseResponse<User> updateAdminInfo(
+            @PathVariable Long adminId,
+            @RequestBody AdminUpdateDTO adminUpdateDTO) {
+
+        log.info("管理员修改个人信息，管理员ID:{}，更新内容:{}", adminId, adminUpdateDTO);
+
+        User updatedAdmin = userService.updateAdminInfo(adminId, adminUpdateDTO);
+        return ResultUtils.success(updatedAdmin);
+    }
+
 }

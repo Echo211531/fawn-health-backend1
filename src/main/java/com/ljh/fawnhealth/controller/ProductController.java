@@ -12,9 +12,11 @@ import com.ljh.fawnhealth.model.dto.user.UserLoginDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.WeightDTO;
 import com.ljh.fawnhealth.model.entity.User;
+import com.ljh.fawnhealth.model.vo.product.CartVO;
 import com.ljh.fawnhealth.model.vo.product.ProductVO;
 import com.ljh.fawnhealth.model.vo.user.UserInfoVO;
 import com.ljh.fawnhealth.model.vo.user.UserLoginVO;
+import com.ljh.fawnhealth.service.CartService;
 import com.ljh.fawnhealth.service.EmailService;
 import com.ljh.fawnhealth.service.ProductService;
 import com.ljh.fawnhealth.service.UserService;
@@ -40,6 +42,9 @@ public class ProductController {
 
     @Resource
     private ProductService productService;
+
+    @Resource
+    private CartService cartService;
 
     /**
      * 管理员创建商品
@@ -200,5 +205,50 @@ public class ProductController {
         log.info(message + "，商品ID: {}", productId);
         return ResultUtils.success(message);
     }
+
+    /**
+     * 添加商品到购物车
+     *
+     * @param cartDTO
+     * @param userId
+     * @return
+     */
+    @PostMapping("/cart/add")
+    public BaseResponse<String> addToCart(@RequestBody CartAddDTO cartDTO, @RequestParam Long userId) {
+        cartService.addToCart(userId, cartDTO.getProductId(), cartDTO.getQuantity());
+        log.info("商品添加到购物车成功，用户ID: {}, 商品ID: {}, 数量: {}",
+                userId, cartDTO.getProductId(), cartDTO.getQuantity());
+        return ResultUtils.success("商品已成功添加到购物车");
+    }
+
+    /**
+     * 从购物车移除商品
+     *
+     * @param userId
+     * @param productId
+     * @return
+     */
+    @PostMapping("/cart/remove")
+    public BaseResponse<String> removeFromCart(@RequestParam Long userId, @RequestParam Long productId) {
+        // 调用服务层移除购物车商品
+        cartService.removeFromCart(userId, productId);
+        log.info("商品从购物车移除成功，用户ID: {}, 商品ID: {}", userId, productId);
+        return ResultUtils.success("商品已从购物车移除");
+    }
+
+    /**
+     * 查询用户购物车列表（包含商品详情）
+     *
+     * @param userId 用户ID
+     * @return 购物车列表（包含商品信息）
+     */
+    @GetMapping("/cart/list")
+    public BaseResponse<List<CartVO>> getUserCartList(@RequestParam Long userId) {
+        // 调用服务层查询用户购物车列表
+        List<CartVO> cartList = cartService.getUserCartList(userId);
+        log.info("用户查询购物车成功，用户ID: {}, 商品数量: {}", userId, cartList.size());
+        return ResultUtils.success(cartList);
+    }
+
 
 }

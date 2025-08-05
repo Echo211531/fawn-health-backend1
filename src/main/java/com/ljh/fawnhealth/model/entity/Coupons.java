@@ -139,6 +139,11 @@ public class Coupons implements Serializable {
      */
     private Integer isDelete;
 
+    /**
+     * 创建人
+     */
+    private Long creater;
+
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 }

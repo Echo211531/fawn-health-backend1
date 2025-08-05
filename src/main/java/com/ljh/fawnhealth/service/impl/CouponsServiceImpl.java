@@ -544,6 +544,4 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
             log.info("未发现发放已过期的优惠券");
         }
     }
-
-    // 已有的其他方法...
 }

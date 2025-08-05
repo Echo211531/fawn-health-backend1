@@ -51,10 +51,15 @@
             <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
             <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
+            <result property="refundAmount" column="refund_amount" jdbcType="DECIMAL"/>
+            <result property="refundReason" column="refund_reason" jdbcType="VARCHAR"/>
+            <result property="refundRejectReason" column="refund_reject_reason" jdbcType="VARCHAR"/>
+            <result property="refundTime" column="refund_time" jdbcType="TIMESTAMP"/>
+            <result property="refundStatus" column="refund_status" jdbcType="TINYINT"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,order_no,user_id,
+        id,order_no,user_id,refund_amount,refund_reason,refund_time,refund_status,refund_reject_reason
         total_amount,payment_amount,freight_amount,
         discount_amount,coupon_amount,payment_type,
         payment_time,payment_serial_number,status,

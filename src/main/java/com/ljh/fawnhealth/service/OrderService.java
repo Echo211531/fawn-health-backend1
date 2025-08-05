@@ -2,9 +2,7 @@ package com.ljh.fawnhealth.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.ljh.fawnhealth.model.dto.order.OrderCreateDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderPageQueryDTO;
-import com.ljh.fawnhealth.model.dto.order.OrderStatusUpdateDTO;
+import com.ljh.fawnhealth.model.dto.order.*;
 import com.ljh.fawnhealth.model.entity.Order;
 import com.ljh.fawnhealth.model.vo.order.*;
 
@@ -109,4 +107,30 @@ public interface OrderService extends IService<Order> {
      * @return 修改后的订单信息
      */
     OrderVO updateOrderStatus(OrderStatusUpdateDTO updateDTO);
+
+    /**
+     * 用户确认订单收货
+     * 更新订单确认状态为“已确认”，记录收货时间，同时将订单状态更新为“已完成”
+     *
+     * @param confirmReceiveDTO 确认收货参数（包含订单ID）
+     * @return 更新后的订单信息
+     */
+    OrderVO confirmOrderReceive(OrderConfirmReceiveDTO confirmReceiveDTO);
+
+    /**
+     * 用户申请订单退款
+     * 验证订单状态后，更新订单为“已退款”状态，记录退款信息
+     *
+     * @param refundDTO 退款申请参数（订单ID、退款原因等）
+     * @return 更新后的订单信息
+     */
+    OrderVO applyOrderRefund(OrderRefundDTO refundDTO);
+
+    /**
+     * 管理员审核退款申请
+     *
+     * @param auditDTO 审核参数（订单ID、审核结果、备注）
+     * @return 更新后的订单信息
+     */
+    OrderVO auditRefund(OrderRefundAuditDTO auditDTO);
 }

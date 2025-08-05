@@ -3,6 +3,7 @@ package com.ljh.fawnhealth.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ljh.fawnhealth.model.dto.user.AdminAddDTO;
+import com.ljh.fawnhealth.model.dto.user.AdminUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.UserPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
@@ -112,4 +113,13 @@ public interface UserService extends IService<User> {
      * @return 添加结果
      */
     void addAdmin(AdminAddDTO adminAddDTO,Long id);
+
+    /**
+     * 管理员修改个人信息接口
+     *
+     * @param adminId 管理员ID（路径参数，用于定位修改对象）
+     * @param adminUpdateDTO 管理员信息更新参数
+     * @return 更新后的管理员信息
+     */
+    User updateAdminInfo(Long adminId, AdminUpdateDTO adminUpdateDTO);
 }

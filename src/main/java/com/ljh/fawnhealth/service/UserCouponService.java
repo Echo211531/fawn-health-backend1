@@ -1,6 +1,8 @@
 package com.ljh.fawnhealth.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.ljh.fawnhealth.model.dto.order.CouponDiscountDTO;
+import com.ljh.fawnhealth.model.dto.order.OrderProductDTO;
 import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.model.entity.UserCoupon;
 import com.ljh.fawnhealth.model.vo.coupons.UserCouponsVO;
@@ -35,4 +37,12 @@ public interface UserCouponService extends IService<UserCoupon> {
     void exchangeCoupon(Long userId, String code);
 
     List<UserCouponsVO> listUserCoupons(Long userId, Integer status);
+
+    /**
+     * 返回可用优惠券信息
+     *
+     * @param orderProducts
+     * @return
+     */
+    List<CouponDiscountDTO> findDiscountSolution(List<OrderProductDTO> orderProducts, Long userId);
 }

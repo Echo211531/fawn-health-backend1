@@ -1,7 +1,11 @@
 package com.ljh.fawnhealth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.ljh.fawnhealth.model.entity.Coupons;
 import com.ljh.fawnhealth.model.entity.UserCoupon;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 
 /**
@@ -12,6 +16,7 @@ import com.ljh.fawnhealth.model.entity.UserCoupon;
 */
 public interface UserCouponMapper extends BaseMapper<UserCoupon> {
 
+    List<Coupons> querMyCoupons(@Param("userId") Long userId);
 }
 
 
