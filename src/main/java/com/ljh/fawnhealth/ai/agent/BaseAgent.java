@@ -154,7 +154,7 @@ public abstract class BaseAgent {
                             ### 任务要求：
                             - 总结要简洁明了，突出重点
                             - 包含关键信息和结论
-                            - 不超过1500字
+                            - 不超过2000字
                             - 使用中文回答
                             - 如果涉及工具搜索结果，请整合相关信息给出完整答案
 
@@ -162,7 +162,7 @@ public abstract class BaseAgent {
                             """ + conversationHistory;
 
                     List<Message> summaryMessages = new ArrayList<>();
-                    summaryMessages.add(new SystemMessage("你是一个专业总结助手，请基于完整的对话历史和工具执行结果，用简洁的语言总结核心结论"));
+                    summaryMessages.add(new SystemMessage("你是一个专业的总结助手，请基于完整的对话历史和工具执行结果，总结一下上下文的核心内容，不超过2000字"));
                     summaryMessages.add(new UserMessage(summaryPrompt));
 
                     try {

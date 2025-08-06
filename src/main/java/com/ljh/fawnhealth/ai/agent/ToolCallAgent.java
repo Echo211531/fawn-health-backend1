@@ -268,7 +268,8 @@ public class ToolCallAgent extends ReActAgent {
         prompt.append("2. 分析需要哪些工具来获取相关信息\n");
         prompt.append("3. 确定工具调用的顺序（如果涉及多个工具）\n");
         prompt.append("4. 每个工具只能调用一次\n");
-        prompt.append("5. 如果不需要工具，请直接给出答案\n\n");
+        prompt.append("5. 如果不需要工具，请直接给出答案\n");
+        prompt.append("6. 如果任务完成，可以使用doTerminate工具结束任务\n\n");
         prompt.append("### 可用工具：\n");
 
         if (availableTools != null) {
@@ -281,7 +282,7 @@ public class ToolCallAgent extends ReActAgent {
 
         prompt.append("\n### 用户问题：\n");
         prompt.append(context.getQuery());
-        prompt.append("\n\n请分析并调用必要的工具。");
+        prompt.append("\n\n请分析并调用必要的工具。如果任务完成，请使用doTerminate工具结束。");
 
         return prompt.toString();
     }
@@ -298,12 +299,6 @@ public class ToolCallAgent extends ReActAgent {
             return "所有工具已执行完成";
         }
 
-        // 检查toolCallChatResponse是否为null
-        if (this.toolCallChatResponse == null) {
-            log.error("toolCallChatResponse为null，无法执行工具");
-            return "工具执行失败：toolCallChatResponse为null";
-        }
-
         // 获取当前要执行的工具
         AssistantMessage.ToolCall currentToolCall = toolExecutionPlan.get(currentToolIndex);
 
@@ -311,38 +306,77 @@ public class ToolCallAgent extends ReActAgent {
                 String.format("🔄 正在执行第 %d/%d 个工具: %s",
                         currentToolIndex + 1, toolExecutionPlan.size(), currentToolCall.name()));
 
+        // 检查toolCallChatResponse是否为null
+        if (this.toolCallChatResponse == null) {
+            log.error("toolCallChatResponse为null，无法执行工具");
+            String errorResult = "工具执行失败：toolCallChatResponse为null";
+            sendStreamEvent(emitter, StreamEventType.TOOL_RESPONSE, errorResult);
+            currentToolIndex++;
+            return errorResult;
+        }
+
         log.info("执行工具: {} - {}", currentToolCall.name(), currentToolCall.arguments());
 
-        // 直接使用原始的toolCallChatResponse，ToolCallingManager会处理所有工具调用
-        // 但只执行当前索引对应的工具
+        // 调用工具
         Prompt prompt = new Prompt(getMessageList(), chatOptions);
-        ToolExecutionResult toolExecutionResult = toolCallingManager.executeToolCalls(
-                prompt, this.toolCallChatResponse);
-        // 记录消息上下文
-        setMessageList(toolExecutionResult.conversationHistory());
-
-        // 当前工具调用的结果
-        ToolResponseMessage toolResponseMessage = (ToolResponseMessage) CollUtil
-                .getLast(toolExecutionResult.conversationHistory());
-
-        // 生成工具响应（去重处理）
+        ToolExecutionResult toolExecutionResult = null;
         Map<String, String> uniqueResults = new LinkedHashMap<>();
-        for (ToolResponseMessage.ToolResponse response : toolResponseMessage.getResponses()) {
-            String toolName = response.name();
-            String responseData = response.responseData();
 
-            // 去重：如果相同工具的结果已存在
-            uniqueResults.put(toolName, responseData);
+        try {
+            // 这里需要创建一个包含单个工具调用的响应
+            // 暂时使用现有的逻辑，后续可以优化
+            toolExecutionResult = toolCallingManager.executeToolCalls(
+                    prompt, this.toolCallChatResponse);
+
+            // 检查工具执行结果
+            if (toolExecutionResult == null || toolExecutionResult.conversationHistory() == null ||
+                    toolExecutionResult.conversationHistory().isEmpty()) {
+                log.error("工具执行失败：toolExecutionResult为空或conversationHistory为空");
+                uniqueResults.put(currentToolCall.name(), "工具执行失败：未获取到执行结果");
+            } else {
+                // 记录消息上下文
+                setMessageList(toolExecutionResult.conversationHistory());
+
+                // 当前工具调用的结果
+                ToolResponseMessage toolResponseMessage = (ToolResponseMessage) CollUtil
+                        .getLast(toolExecutionResult.conversationHistory());
+
+                if (toolResponseMessage == null) {
+                    log.error("工具执行失败：toolResponseMessage为空");
+                    uniqueResults.put(currentToolCall.name(), "工具执行失败：未获取到响应消息");
+                } else {
+                    // 生成工具响应（去重处理）
+                    for (ToolResponseMessage.ToolResponse response : toolResponseMessage.getResponses()) {
+                        String toolName = response.name();
+                        String responseData = response.responseData();
+
+                        // 去重：如果相同工具的结果已存在
+                        uniqueResults.put(toolName, responseData);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("工具执行过程中发生异常: {}", e.getMessage(), e);
+            uniqueResults.put(currentToolCall.name(), "工具执行失败：" + e.getMessage());
         }
 
         // 构建工具响应字符串（格式化输出）
         StringBuilder resultsBuilder = new StringBuilder();
         for (Map.Entry<String, String> entry : uniqueResults.entrySet()) {
+            String toolName = entry.getKey();
+            String result = entry.getValue();
+
             resultsBuilder.append("🛠️ 工具 [")
-                    .append(entry.getKey())
-                    .append("] 执行结果：\n")
-                    .append(entry.getValue())
-                    .append("\n\n");
+                    .append(toolName)
+                    .append("] 执行结果：\n");
+
+            // 检查是否为错误结果
+            if (result != null && (result.contains("失败") || result.contains("错误"))) {
+                resultsBuilder.append("❌ ").append(result);
+            } else {
+                resultsBuilder.append(result != null ? result : "未返回结果");
+            }
+            resultsBuilder.append("\n\n");
         }
         String results = resultsBuilder.toString().trim();
 
@@ -376,13 +410,14 @@ public class ToolCallAgent extends ReActAgent {
 
         // 判断是否调用了终止工具
         boolean terminateToolCalled = false;
-        if (CollUtil.isNotEmpty(toolExecutionResult.conversationHistory())) {
+        if (toolExecutionResult != null && CollUtil.isNotEmpty(toolExecutionResult.conversationHistory())) {
             Message lastMessage = CollUtil.getLast(toolExecutionResult.conversationHistory());
             if (lastMessage instanceof ToolResponseMessage) {
                 ToolResponseMessage toolResponse = (ToolResponseMessage) lastMessage;
                 for (ToolResponseMessage.ToolResponse response : toolResponse.getResponses()) {
                     if ("doTerminate".equals(response.name())) {
                         terminateToolCalled = true;
+                        log.info("🔚 检测到doTerminate工具调用，准备终止任务");
                         break; // 找到终止工具后立即跳出循环
                     }
                 }
@@ -393,6 +428,13 @@ public class ToolCallAgent extends ReActAgent {
         boolean hasValidInfo = results.contains("搜索结果") || results.contains("找到") ||
                 results.contains("获取到") || results.contains("成功") ||
                 results.length() > 100; // 有足够的内容
+
+        // 如果调用了终止工具，立即结束任务
+        if (terminateToolCalled) {
+            log.info("🔚 检测到终止工具调用，设置状态为FINISHED");
+            setState(AgentState.FINISHED);
+            return results;
+        }
 
         // 工具执行完成后，移动到下一个工具
         currentToolIndex++;
@@ -443,12 +485,45 @@ public class ToolCallAgent extends ReActAgent {
     }
 
     /**
+     * 检查是否已经执行过相同的工具调用
+     */
+    private boolean checkIfSameToolExecuted(List<AssistantMessage.ToolCall> currentToolCalls) {
+        if (currentToolCalls == null || currentToolCalls.isEmpty()) {
+            return false;
+        }
+        // 检查消息历史中是否已经执行过相同的工具调用
+        for (Message message : getMessageList()) {
+            if (message instanceof AssistantMessage) {
+                AssistantMessage assistantMessage = (AssistantMessage) message;
+                List<AssistantMessage.ToolCall> historicalToolCalls = assistantMessage.getToolCalls();
+
+                if (historicalToolCalls != null && !historicalToolCalls.isEmpty()) {
+                    // 比较当前工具调用和历史工具调用
+                    for (AssistantMessage.ToolCall currentCall : currentToolCalls) {
+                        for (AssistantMessage.ToolCall historicalCall : historicalToolCalls) {
+                            if (currentCall.name().equals(historicalCall.name()) &&
+                                    currentCall.arguments().equals(historicalCall.arguments())) {
+                                log.info("🔄 发现重复的工具调用: {} - {}", currentCall.name(), currentCall.arguments());
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * 分析工具执行结果
      */
     private void analyzeToolResults(SseEmitter emitter, Map<String, String> toolResults) {
         try {
             StringBuilder analysis = new StringBuilder();
             analysis.append("🔍 **工具结果分析**:\n");
+
+            boolean hasSuccess = false;
+            boolean hasFailure = false;
 
             for (Map.Entry<String, String> entry : toolResults.entrySet()) {
                 String toolName = entry.getKey();
@@ -457,16 +532,21 @@ public class ToolCallAgent extends ReActAgent {
                 // 分析工具执行结果
                 if (StrUtil.isBlank(result) || result.contains("错误") || result.contains("失败")) {
                     analysis.append("❌ ").append(toolName).append(": 执行失败或返回空结果\n");
+                    hasFailure = true;
                 } else if (result.length() > 200) {
                     analysis.append("✅ ").append(toolName).append(": 执行成功，返回大量数据\n");
+                    hasSuccess = true;
                 } else {
                     analysis.append("✅ ").append(toolName).append(": 执行成功\n");
+                    hasSuccess = true;
                 }
             }
 
             analysis.append("\n💡 **建议**: ");
-            if (toolResults.values().stream().anyMatch(r -> StrUtil.isNotBlank(r) && !r.contains("错误"))) {
-                analysis.append("工具执行成功，可以继续下一步操作");
+            if (hasSuccess && !hasFailure) {
+                analysis.append("所有工具执行成功，可以继续下一步操作");
+            } else if (hasSuccess && hasFailure) {
+                analysis.append("部分工具执行成功，部分工具执行失败，建议检查失败的工具");
             } else {
                 analysis.append("工具执行可能存在问题，建议重新尝试或使用其他方法");
             }
@@ -475,6 +555,7 @@ public class ToolCallAgent extends ReActAgent {
             log.info("工具结果分析完成");
         } catch (Exception e) {
             log.error("分析工具结果失败", e);
+            sendStreamEvent(emitter, StreamEventType.THINKING, "❌ 工具结果分析失败: " + e.getMessage());
         }
     }
 

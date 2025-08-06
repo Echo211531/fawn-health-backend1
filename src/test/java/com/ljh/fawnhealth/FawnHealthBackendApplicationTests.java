@@ -1,7 +1,7 @@
 package com.ljh.fawnhealth;
 
 import com.ljh.fawnhealth.ai.agent.FawnManus;
-import com.ljh.fawnhealth.ai.tools.ZhipuWebSearchTool;
+import com.ljh.fawnhealth.ai.tool.ZhipuWebSearchTool;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
