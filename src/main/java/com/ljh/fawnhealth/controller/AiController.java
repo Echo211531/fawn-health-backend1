@@ -100,7 +100,7 @@ public class AiController {
     private ChatModel dashscopeChatModel;
 
     // 流式调用 Manus 超级智能体（改进版）
-    @GetMapping("/manus/chat")
+    @GetMapping("/chat/manus")
     public SseEmitter doChatWithManus(String message, String chatId) {
         log.info("开始调用FawnManus智能体，消息: {}, chatId: {}", message, chatId);
         try {
