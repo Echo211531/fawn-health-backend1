@@ -5,7 +5,9 @@ import com.ljh.fawnhealth.ai.context.AgentContext;
 import com.ljh.fawnhealth.ai.model.AgentState;
 import com.ljh.fawnhealth.ai.model.StreamEvent;
 import com.ljh.fawnhealth.ai.model.StreamEventType;
+import com.ljh.fawnhealth.ai.store.ChatStreamEventStore;
 import com.ljh.fawnhealth.ai.tool.collection.ToolCollection;
+import com.ljh.fawnhealth.context.BaseContext;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -45,6 +47,14 @@ public abstract class BaseAgent {
     protected AgentContext context; // 智能体上下文
 
     protected String chatId; // 统一会话ID字段
+
+    // 添加流式事件存储器，使用静态方式注入避免循环依赖
+    private static ChatStreamEventStore chatStreamEventStore;
+
+    // 静态方法设置存储器
+    public static void setChatStreamEventStore(ChatStreamEventStore store) {
+        chatStreamEventStore = store;
+    }
 
     public BaseAgent() {
         this(null); // 调用带参数的构造函数
@@ -185,7 +195,8 @@ public abstract class BaseAgent {
                         }
                     } catch (Exception e) {
                         log.error("生成最终总结失败", e);
-                        sendStreamEvent(sseEmitter, StreamEventType.FINAL_RESPONSE, "✅ 任务完成，但生成总结时出现错误: " + e.getMessage());
+                        sendStreamEvent(sseEmitter, StreamEventType.FINAL_RESPONSE,
+                                "✅ 任务完成，但生成总结时出现错误: " + e.getMessage());
                     }
                     finalResponseSent = true;
                 }
@@ -240,9 +251,35 @@ public abstract class BaseAgent {
                 log.warn("尝试发送空内容的事件: {}", type);
                 return;
             }
-            emitter.send(new StreamEvent(type, content));
+            
+            StreamEvent streamEvent = new StreamEvent(type, content);
+            emitter.send(streamEvent);
+            
+            // 保存流式事件到数据库
+            if (chatStreamEventStore != null && StrUtil.isNotBlank(chatId)) {
+                try {
+                    // 获取当前用户ID
+                    String userId = getCurrentUserId();
+                    chatStreamEventStore.saveStreamEvent(chatId, streamEvent, userId);
+                } catch (Exception e) {
+                    log.error("保存流式事件到数据库失败: chatId={}, type={}", chatId, type, e);
+                }
+            }
         } catch (IOException e) {
             log.error("发送SSE事件失败", e);
+        }
+    }
+    
+    /**
+     * 获取当前用户ID
+     */
+    private String getCurrentUserId() {
+        try {
+            Long currentId = BaseContext.getCurrentId();
+            return currentId != null ? currentId.toString() : "unknown";
+        } catch (Exception e) {
+            log.debug("获取当前用户ID失败，使用默认值", e);
+            return "unknown";
         }
     }
 

@@ -122,6 +122,10 @@ public class ZhipuWebSearchTool {
 
         int count = 1;
         for (SearchResult searchResult : response.getSearchResult()) {
+            // 如果已经输出5条，跳出循环
+            if (count > 5) {
+                break;
+            }
             result.append(count++).append(". ");
             result.append("标题: ").append(searchResult.getTitle()).append("\n");
             if (searchResult.getContent() != null && !searchResult.getContent().isEmpty()) {

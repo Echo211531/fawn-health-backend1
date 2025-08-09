@@ -6,6 +6,10 @@ import com.ljh.fawnhealth.ai.agent.queue.UserInputQueue;
 import com.ljh.fawnhealth.ai.app.HealthApp;
 import com.ljh.fawnhealth.ai.app.HealthReportApp;
 import com.ljh.fawnhealth.ai.context.AgentContext;
+import com.ljh.fawnhealth.ai.model.ChatStreamEvent;
+import com.ljh.fawnhealth.ai.model.StreamEvent;
+import com.ljh.fawnhealth.ai.model.StreamEventType;
+import com.ljh.fawnhealth.ai.store.ChatStreamEventStore;
 import com.ljh.fawnhealth.ai.store.MongoChatMemory;
 import com.ljh.fawnhealth.ai.tool.collection.ToolCollection;
 import com.ljh.fawnhealth.commen.BaseResponse;
@@ -24,6 +28,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -98,6 +103,8 @@ public class AiController {
     private ToolCallback[] allTools;
     @Resource
     private ChatModel dashscopeChatModel;
+    @Resource
+    private ChatStreamEventStore chatStreamEventStore;
 
     // 流式调用 Manus 超级智能体（改进版）
     @GetMapping("/chat/manus")
@@ -180,16 +187,6 @@ public class AiController {
         return ResultUtils.success(history);
     }
 
-    /**
-     * 获取所有 chatId 列表（用于展示对话历史页面）
-     */
-    @GetMapping("/conversations")
-    public BaseResponse<List<String>> getAllConversations() {
-        Long currentUserId = BaseContext.getCurrentId();
-        String userId = currentUserId.toString();
-        List<String> conversationIds = mongoChatMemory.findAllConversationIds(userId);
-        return ResultUtils.success(conversationIds);
-    }
 
     /**
      * 新建对话：生成新的 chatId，并在 MongoDB 中插入一条空记录
@@ -208,7 +205,83 @@ public class AiController {
     @DeleteMapping("/conversations/{chatId}")
     public BaseResponse<Boolean> deleteConversation(@PathVariable String chatId) {
         mongoChatMemory.clear(chatId);
+        // 同时删除流式事件历史
+        chatStreamEventStore.clearStreamEvents(chatId);
         return ResultUtils.success(true);
+    }
+
+    /**
+     * 获取所有 chatId 列表（用于展示对话历史页面）
+     */
+    @GetMapping("/conversations")
+    public BaseResponse<List<String>> getAllConversations() {
+        Long currentUserId = BaseContext.getCurrentId();
+        String userId = currentUserId.toString();
+        List<String> conversationIds = mongoChatMemory.findAllConversationIds(userId);
+        return ResultUtils.success(conversationIds);
+    }
+
+    /**
+     * 获取会话的完整交互历史（包含思考过程、工具调用等）
+     * 
+     * @param chatId 会话ID
+     * @param lastN  获取最近N条事件（默认获取全部）
+     * @return 流式事件列表
+     */
+    @GetMapping("/history/{chatId}/stream")
+    public BaseResponse<List<StreamEvent>> getChatStreamHistory(
+            @PathVariable String chatId,
+            @RequestParam(defaultValue = "-1") int lastN) {
+        try {
+            List<ChatStreamEvent> chatStreamEvents;
+            if (lastN <= 0) {
+                chatStreamEvents = chatStreamEventStore.getStreamEvents(chatId);
+            } else {
+                chatStreamEvents = chatStreamEventStore.getStreamEvents(chatId, lastN);
+            }
+
+            List<StreamEvent> streamEvents = chatStreamEventStore.toStreamEvents(chatStreamEvents);
+            return ResultUtils.success(streamEvents);
+        } catch (Exception e) {
+            log.error("获取流式事件历史失败: chatId={}", chatId, e);
+            return new BaseResponse<>(ErrorCode.SYSTEM_ERROR.getCode(), null, "获取历史记录失败");
+        }
+    }
+
+    /**
+     * 按事件类型获取会话历史
+     * 
+     * @param chatId 会话ID
+     * @param types  事件类型列表，多个类型用逗号分隔（如：THINKING,TOOL_RESPONSE,FINAL_RESPONSE）
+     * @return 指定类型的流式事件列表
+     */
+    @GetMapping("/history/{chatId}/stream/by-type")
+    public BaseResponse<List<StreamEvent>> getChatStreamHistoryByType(
+            @PathVariable String chatId,
+            @RequestParam String types) {
+        try {
+            // 解析事件类型
+            String[] typeArray = types.split(",");
+            List<StreamEventType> eventTypes = new ArrayList<>();
+            for (String type : typeArray) {
+                try {
+                    eventTypes.add(StreamEventType.valueOf(type.trim().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    log.warn("无效的事件类型: {}", type);
+                }
+            }
+
+            if (eventTypes.isEmpty()) {
+                return new BaseResponse<>(ErrorCode.PARAMS_ERROR.getCode(), null, "无效的事件类型参数");
+            }
+
+            List<ChatStreamEvent> chatStreamEvents = chatStreamEventStore.getStreamEventsByType(chatId, eventTypes);
+            List<StreamEvent> streamEvents = chatStreamEventStore.toStreamEvents(chatStreamEvents);
+            return ResultUtils.success(streamEvents);
+        } catch (Exception e) {
+            log.error("按类型获取流式事件历史失败: chatId={}, types={}", chatId, types, e);
+            return new BaseResponse<>(ErrorCode.SYSTEM_ERROR.getCode(), null, "获取历史记录失败");
+        }
     }
 
 }
