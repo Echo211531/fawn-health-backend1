@@ -15,6 +15,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class FawnHealthBackendApplication {
 
     public static void main(String[] args) {
+        // 禁用MVEL JIT，避免JDK17下对java.lang.Compiler的依赖
+        System.setProperty("mvel2.disable.jit", "true");
         SpringApplication.run(FawnHealthBackendApplication.class, args);
     }
 

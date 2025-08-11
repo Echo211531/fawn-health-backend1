@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.HealthRuleMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.HealthRule">
+        <id column="id" property="id" />
+        <result column="name" property="name" />
+        <result column="description" property="description" />
+        <result column="condition_expr" property="conditionExpr" />
+        <result column="risk_type" property="riskType" />
+        <result column="priority" property="priority" />
+        <result column="enabled" property="enabled" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, name, description, condition_expr, risk_type, priority, enabled, create_time, update_time
+    </sql>
+
+    <!-- 查询所有启用的规则，按优先级排序 -->
+    <select id="selectEnabledRulesOrderByPriority" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_rules
+        WHERE enabled = 1
+        ORDER BY priority ASC, create_time ASC
+    </select>
+
+    <!-- 根据风险类型查询启用的规则 -->
+    <select id="selectByRiskTypeAndEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_rules
+        WHERE risk_type = #{riskType} AND enabled = 1
+        ORDER BY priority ASC
+    </select>
+
+    <!-- 根据规则名称模糊查询 -->
+    <select id="selectByNameLike" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_rules
+        WHERE name LIKE CONCAT('%', #{name}, '%')
+        ORDER BY priority ASC, create_time ASC
+    </select>
+
+</mapper> 

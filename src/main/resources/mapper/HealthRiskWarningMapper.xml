@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.HealthRiskWarningMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.HealthRiskWarning">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="risk_type" property="riskType" />
+        <result column="rule_id" property="ruleId" />
+        <result column="trigger_data" property="triggerData" />
+        <result column="intervention_content" property="interventionContent" />
+        <result column="status" property="status" />
+        <result column="trigger_time" property="triggerTime" />
+        <result column="process_time" property="processTime" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, user_id, risk_type, rule_id, trigger_data, intervention_content, status, trigger_time, process_time, create_time
+    </sql>
+
+    <!-- 查询用户的风险预警记录 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_risk_warnings
+        WHERE user_id = #{userId}
+        ORDER BY trigger_time DESC
+    </select>
+
+    <!-- 查询用户指定时间范围内的风险预警记录 -->
+    <select id="selectByUserIdAndTimeRange" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_risk_warnings
+        WHERE user_id = #{userId}
+        AND trigger_time BETWEEN #{startTime} AND #{endTime}
+        ORDER BY trigger_time DESC
+    </select>
+
+    <!-- 查询未处理的风险预警记录 -->
+    <select id="selectUnprocessedWarnings" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_risk_warnings
+        WHERE status = 0
+        ORDER BY trigger_time ASC
+    </select>
+
+    <!-- 根据风险类型查询预警记录 -->
+    <select id="selectByRiskType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM health_risk_warnings
+        WHERE risk_type = #{riskType}
+        ORDER BY trigger_time DESC
+    </select>
+
+</mapper> 

@@ -19,6 +19,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -47,8 +49,12 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
     @Resource
     private FoodLibraryMapper foodLibraryMapper;
 
+    @Autowired
+    private ApplicationEventPublisher applicationEventPublisher;
+
     /**
      * 添加一条饮食记录，包括主记录和对应的多个食物项
+     * 
      * @param dto 添加饮食记录的数据传输对象
      * @return 添加成功返回true，否则false
      */
@@ -71,6 +77,10 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         if (insert <= 0) {
             return BigDecimal.ZERO; // 插入失败，返回 0 热量
         }
+        // 发布记录创建事件，触发健康风险评估（使用Spring注入的发布器）
+        if (this.applicationEventPublisher != null) {
+            this.applicationEventPublisher.publishEvent(new com.ljh.fawnhealth.events.DietRecordCreatedEvent(dto.getUserId()));
+        }
 
         Long recordId = record.getId();
 
@@ -91,10 +101,14 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
                     item.setUnit("g");
 
                     // 营养素 = 每100g值 * 实际克数 / 100
-                    BigDecimal calories = safeMultiply(food.getCalories(), amount).divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
-                    BigDecimal protein = safeMultiply(food.getProtein(), amount).divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
-                    BigDecimal fat = safeMultiply(food.getFat(), amount).divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
-                    BigDecimal carbohydrate = safeMultiply(food.getCarbohydrate(), amount).divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+                    BigDecimal calories = safeMultiply(food.getCalories(), amount).divide(BigDecimal.valueOf(100), 2,
+                            BigDecimal.ROUND_HALF_UP);
+                    BigDecimal protein = safeMultiply(food.getProtein(), amount).divide(BigDecimal.valueOf(100), 2,
+                            BigDecimal.ROUND_HALF_UP);
+                    BigDecimal fat = safeMultiply(food.getFat(), amount).divide(BigDecimal.valueOf(100), 2,
+                            BigDecimal.ROUND_HALF_UP);
+                    BigDecimal carbohydrate = safeMultiply(food.getCarbohydrate(), amount)
+                            .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
 
                     item.setCalories(calories);
                     item.setProtein(protein);
@@ -130,7 +144,6 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         return totalCalories;
     }
 
-
     private BigDecimal safeMultiply(BigDecimal value1, BigDecimal value2) {
         if (value1 == null || value2 == null) {
             return BigDecimal.ZERO;
@@ -138,11 +151,11 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         return value1.multiply(value2);
     }
 
-
     /**
      * 查询指定用户某天的饮食记录（简要信息）
+     * 
      * @param userId 用户ID
-     * @param date 指定日期，null则默认今天
+     * @param date   指定日期，null则默认今天
      * @return 饮食记录简要信息列表
      */
     @Override
@@ -181,11 +194,11 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         return result;
     }
 
-
     /**
      * 查询指定用户最近N天的饮食历史记录（简要信息）
+     * 
      * @param userId 用户ID
-     * @param days 天数，若为null则查询全部
+     * @param days   天数，若为null则查询全部
      * @return 饮食记录简要信息列表
      */
     @Override
@@ -219,14 +232,14 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
                 if (item.getFoodId() != null) {
                     FoodLibrary food = foodLibraryMapper.selectById(item.getFoodId());
                     if (food != null) {
-                        // 设置食物名称（注意：原DTO中foodName是Long类型，需要先修改为String）
                         dto.setFoodName(food.getName());
                         dto.setFoodImage(food.getImage());
+                        dto.setCategoryName(food.getCategoryName());
                     }
                 } else {
-                    // 处理手动添加的食物（没有foodId的情况）
-                    dto.setFoodName(item.getFoodName()); // 直接使用item中的食物名称
-                    dto.setFoodImage(null); // 手动添加的食物可能没有图片
+                    dto.setFoodName(item.getFoodName());
+                    dto.setFoodImage(null);
+                    dto.setCategoryName(null);
                 }
 
                 return dto;
@@ -238,16 +251,17 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         return result;
     }
 
-
     /**
      * 根据饮食记录ID查询详细信息，包括食物项列表
+     * 
      * @param id 饮食记录ID
      * @return 饮食记录详情VO，若记录不存在或已删除返回null
      */
     @Override
     public DietRecordDetailVO getDietRecordDetail(Long id) {
         DietRecords record = dietRecordsMapper.selectById(id);
-        if (record == null || record.getIsDelete() == 1) return null;
+        if (record == null || record.getIsDelete() == 1)
+            return null;
 
         DietRecordDetailVO vo = new DietRecordDetailVO();
         BeanUtils.copyProperties(record, vo);
@@ -264,13 +278,15 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
 
     /**
      * 软删除饮食记录（设置isDelete为1），同时软删除对应的食物项
+     * 
      * @param id 饮食记录ID
      * @return 删除成功返回true，否则false
      */
     @Override
     public boolean deleteDietRecord(Long id) {
         DietRecords record = dietRecordsMapper.selectById(id);
-        if (record == null) return false;
+        if (record == null)
+            return false;
 
         record.setIsDelete(1);
         record.setUpdateTime(new Date());
@@ -320,7 +336,7 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
                 DietFoodItems item = new DietFoodItems();
                 item.setRecordId(record.getId());
                 item.setFoodId(itemDTO.getFoodId());
-                item.setFoodName(food.getName());    // 食物名称
+                item.setFoodName(food.getName()); // 食物名称
 
                 item.setAmount(itemDTO.getAmount());
                 item.setUnit(itemDTO.getUnit());
@@ -373,7 +389,6 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
-
 
     // 除法安全计算，避免除以零或null
     private BigDecimal safeDivide(BigDecimal a, BigDecimal b) {

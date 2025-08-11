@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.InterventionPlanMapper">
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.enums.rule.InterventionPlan">
+        <id column="id" property="id" />
+        <result column="risk_type" property="riskType" />
+        <result column="title" property="title" />
+        <result column="content" property="content" />
+        <result column="intervention_type" property="interventionType" />
+        <result column="target_audience" property="targetAudience" />
+        <result column="expected_outcome" property="expectedOutcome" />
+        <result column="precautions" property="precautions" />
+        <result column="enabled" property="enabled" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, risk_type, title, content, intervention_type, target_audience, expected_outcome, precautions, enabled, create_time, update_time
+    </sql>
+
+    <select id="selectEnabledByRiskType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM intervention_plans
+        WHERE enabled = 1 AND risk_type = #{riskType}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List" />
+        FROM intervention_plans
+        WHERE enabled = 1
+        ORDER BY create_time DESC
+    </select>
+
+</mapper> 

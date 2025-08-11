@@ -40,4 +40,29 @@ public class DietFoodItemDTO {
      * 食物图片
      */
     private String foodImage;
+
+    /**
+     * 分类名称（用于识别蔬菜等类别）
+     */
+    private String categoryName;
+
+    /**
+     * 热量(kcal)
+     */
+    private BigDecimal calories;
+
+    /**
+     * 蛋白质(g)
+     */
+    private BigDecimal protein;
+
+    /**
+     * 脂肪(g)
+     */
+    private BigDecimal fat;
+
+    /**
+     * 碳水化合物(g)
+     */
+    private BigDecimal carbohydrate;
 }
