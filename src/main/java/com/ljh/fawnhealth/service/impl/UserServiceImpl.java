@@ -983,6 +983,50 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     /**
+     * 获取用户性别分布统计数据
+     *
+     * @return 性别分布统计VO
+     */
+    @Override
+    public UserGenderStatisticsVO getGenderDistributionStatistics() {
+        // 1. 查询各性别用户数量（0-未知，1-男，2-女）
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("gender", "COUNT(*) as count");
+        queryWrapper.groupBy("gender");
+        List<Map<String, Object>> genderMaps = userMapper.selectMaps(queryWrapper);
+
+        // 2. 初始化统计数据（默认值为0）
+        int unknownCount = 0;
+        int maleCount = 0;
+        int femaleCount = 0;
+
+        // 3. 解析查询结果
+        for (Map<String, Object> map : genderMaps) {
+            Integer gender = (Integer) map.get("gender");
+            Integer count = Integer.parseInt(map.get("count").toString());
+
+            if (gender == 0) {
+                unknownCount = count;
+            } else if (gender == 1) {
+                maleCount = count;
+            } else if (gender == 2) {
+                femaleCount = count;
+            }
+        }
+
+        // 4. 计算总用户数
+        int totalUserCount = unknownCount + maleCount + femaleCount;
+
+        // 5. 封装VO对象
+        UserGenderStatisticsVO statisticsVO = new UserGenderStatisticsVO();
+        statisticsVO.setGenderLabels(Arrays.asList("未知", "男", "女"));
+        statisticsVO.setGenderCounts(Arrays.asList(unknownCount, maleCount, femaleCount));
+        statisticsVO.setTotalUserCount(totalUserCount);
+
+        return statisticsVO;
+    }
+
+    /**
      * 邮箱脱敏（如：test@example.com → t***@example.com）
      */
     private String maskEmail(String email) {

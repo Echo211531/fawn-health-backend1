@@ -1084,6 +1084,78 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
     }
 
     /**
+     * 获取销量Top10的商品统计数据
+     *
+     * @param timeRange 时间范围（可选，如"30天"、"90天"、"all"，默认all）
+     * @return 销量Top10统计结果
+     */
+    @Override
+    public ProductSalesTop10VO getTop10ProductSales(String timeRange) {
+        // 1. 处理时间范围参数，默认统计全部时间
+        String actualTimeRange = timeRange == null ? "all" : timeRange;
+        LocalDateTime startTime = null;
+
+        // 根据时间范围计算起始时间
+        if ("30天".equals(actualTimeRange)) {
+            startTime = LocalDateTime.now().minusDays(30);
+        } else if ("90天".equals(actualTimeRange)) {
+            startTime = LocalDateTime.now().minusDays(90);
+        } else if ("365天".equals(actualTimeRange)) {
+            startTime = LocalDateTime.now().minusDays(365);
+        }
+        // "all" 或其他值则不限制时间范围
+
+        // 2. 构建查询条件（关联订单表和订单商品表，过滤有效订单）
+        QueryWrapper<OrderItem> queryWrapper = new QueryWrapper<>();
+        // 关联订单表，只统计已支付或已完成的有效订单
+        queryWrapper.inSql("order_id",
+                "SELECT id FROM `order` WHERE status IN (1,2,3) AND is_delete = 0" +
+                        (startTime != null ? " AND create_time >= '" + startTime + "'" : ""));
+        // 排除已删除的订单项
+        queryWrapper.eq("is_delete", 0);
+
+        // 3. 按商品分组统计销量和金额
+        queryWrapper.select(
+                "product_id",
+                "product_name",
+                "product_image",
+                "current_price",
+                "SUM(quantity) as total_sales",
+                "SUM(total_price) as total_sales_amount"
+        );
+        queryWrapper.groupBy("product_id", "product_name", "product_image", "current_price");
+        // 按销量降序排序，取前10
+        queryWrapper.orderByDesc("total_sales");
+
+        // 4. 执行查询（如果有时间范围，额外过滤订单项创建时间）
+        if (startTime != null) {
+            queryWrapper.ge("create_time", startTime);
+        }
+
+        List<Map<String, Object>> productSalesMaps = orderItemMapper.selectMaps(queryWrapper);
+
+        // 5. 转换结果为VO列表
+        List<ProductSalesVO> productSalesVOList = productSalesMaps.stream().map(map -> {
+                    ProductSalesVO vo = new ProductSalesVO();
+                    vo.setProductId(((Number) map.get("product_id")).longValue());
+                    vo.setProductName((String) map.get("product_name"));
+                    vo.setProductImage((String) map.get("product_image"));
+                    vo.setCurrentPrice(new BigDecimal(map.get("current_price").toString()));
+                    vo.setTotalSales(((Number) map.get("total_sales")).intValue());
+                    vo.setTotalSalesAmount(new BigDecimal(map.get("total_sales_amount").toString()));
+                    return vo;
+                }).limit(10) // 确保只取前10
+                .collect(Collectors.toList());
+
+        // 6. 封装返回结果
+        ProductSalesTop10VO resultVO = new ProductSalesTop10VO();
+        resultVO.setTop10Products(productSalesVOList);
+        resultVO.setTimeRange("all".equals(actualTimeRange) ? "全部时间" : actualTimeRange);
+
+        return resultVO;
+    }
+
+    /**
      * 记录订单状态变更日志（用于审计和问题排查）
      *
      * @param order

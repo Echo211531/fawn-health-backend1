@@ -133,4 +133,11 @@ public interface OrderService extends IService<Order> {
      * @return 更新后的订单信息
      */
     OrderVO auditRefund(OrderRefundAuditDTO auditDTO);
+
+    /**
+     * 获取销量Top10的商品统计数据
+     * @param timeRange 时间范围（可选，如"30天"、"90天"、"all"，默认all）
+     * @return 销量Top10统计结果
+     */
+    ProductSalesTop10VO getTop10ProductSales(String timeRange);
 }
