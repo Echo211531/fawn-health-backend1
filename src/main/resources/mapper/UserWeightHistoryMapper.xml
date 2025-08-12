@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.UserWeightHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.UserWeightHistory">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="userId" column="user_id" jdbcType="BIGINT"/>
+            <result property="weight" column="weight" jdbcType="DECIMAL"/>
+            <result property="recordDate" column="record_date" jdbcType="DATE"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,user_id,weight,
+        record_date,create_time
+    </sql>
+    <select id="selectByUserIdAndDateRange" resultType="com.ljh.fawnhealth.model.entity.UserWeightHistory">
+        SELECT id, user_id, weight, record_date, create_time
+        FROM user_weight_history
+        WHERE user_id = #{userId}
+        AND record_date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY record_date ASC
+    </select>
+</mapper>

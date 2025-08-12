@@ -22,6 +22,7 @@ import com.ljh.fawnhealth.service.OrderService;
 import com.ljh.fawnhealth.utils.BeanCopyUtils;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 * @description 针对表【order(订单表)】的数据库操作Service实现
 * @createDate 2025-07-14 23:00:39
 */
+@Slf4j
 @Service
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
     implements OrderService {
@@ -434,6 +436,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
         // 使用上海时区确保时间准确性
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
 
+        // 1. 总订单数量：所有订单的总数
+        long orderTotal = countTotalOrders();
+
         // 1. 今日订单：今日00:00:00至当前时间
         LocalDateTime todayStart = now.with(LocalTime.MIN);
         LocalDateTime todayEnd = now;
@@ -458,10 +463,26 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
         statisticsVO.setYesterdayOrderCount(yesterdayOrderCount);
         statisticsVO.setMonthOrderCount(monthOrderCount); // 设置新增字段
         statisticsVO.setDayOnDayRate(dayOnDayRate);
+        statisticsVO.setOrderTotal(orderTotal);
         statisticsVO.setStatisticTime(now);
 
         return statisticsVO;
     }
+
+    /**
+     * 统计总订单数量
+     */
+    private long countTotalOrders() {
+        // 查询所有订单的总数，这里假设订单表实体为Order
+        LambdaQueryWrapper<Order> queryWrapper = new LambdaQueryWrapper<>();
+        // 排除已删除的订单（is_delete=1 或 delete_status=1）
+        queryWrapper.eq (Order::getIsDelete, 0)
+                .eq (Order::getDeleteStatus, 0)
+                // 排除已取消、已关闭、已拒绝的无效订单状态
+                .notIn (Order::getStatus, 4, 6, 8);
+        return orderMapper.selectCount(queryWrapper);
+    }
+
 
 
     /**
@@ -473,34 +494,94 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
     public OrderAmountStatisticsVO getOrderAmountStatistics() {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
 
-        // 1. 今日订单总金额
+        // 1. 总订单金额：所有有效订单的实付金额总和
+        BigDecimal totalAmount = sumTotalOrderAmount();
+
+        // 2. 今日订单总金额
         LocalDateTime todayStart = now.with(LocalTime.MIN);
         LocalDateTime todayEnd = now;
         BigDecimal todayAmount = sumOrderAmount(todayStart, todayEnd);
 
-        // 2. 昨日订单总金额
+        // 3. 昨日订单总金额
         LocalDateTime yesterdayStart = todayStart.minusDays(1);
         LocalDateTime yesterdayEnd = yesterdayStart.with(LocalTime.MAX);
         BigDecimal yesterdayAmount = sumOrderAmount(yesterdayStart, yesterdayEnd);
 
-        // 3. 本月订单总金额（新增逻辑）
+        // 4. 本月订单总金额
         LocalDateTime monthStart = now.with(TemporalAdjusters.firstDayOfMonth()).with(LocalTime.MIN);
         LocalDateTime monthEnd = now;
         BigDecimal monthAmount = sumOrderAmount(monthStart, monthEnd);
 
-        // 4. 计算日环比增长率（今日较昨日）
+        // 5. 计算日环比增长率
         BigDecimal dayOnDayRate = calculateAmountDayOnDayRate(todayAmount, yesterdayAmount);
 
-        // 封装结果（包含本月金额）
+        // 封装结果
         OrderAmountStatisticsVO statisticsVO = new OrderAmountStatisticsVO();
         statisticsVO.setTodayOrderAmount(todayAmount);
         statisticsVO.setYesterdayOrderAmount(yesterdayAmount);
-        statisticsVO.setMonthOrderAmount(monthAmount); // 设置新增字段
+        statisticsVO.setMonthOrderAmount(monthAmount);
+        statisticsVO.setOrderTotalAmount(totalAmount); // 设置总订单金额
         statisticsVO.setDayOnDayRate(dayOnDayRate);
         statisticsVO.setStatisticTime(now);
 
         return statisticsVO;
     }
+
+    /**
+     * 统计总订单金额
+     */
+    private BigDecimal sumTotalOrderAmount() {
+        // 1. 构建查询条件
+        QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+        queryWrapper.notIn("status", 4, 5) // 排除已取消(4)、已退款(5)的订单
+                .eq("is_delete", 0); // 排除已删除订单
+
+        // 打印查询条件日志（关键排查步骤）
+        log.info("统计总订单金额的查询条件：status not in (4,5) and is_delete = 0");
+
+        // 2. 先查询符合条件的订单数量（排查是否有符合条件的订单）
+        long validOrderCount = orderMapper.selectCount(queryWrapper);
+        log.info("符合条件的有效订单数量：{}", validOrderCount);
+
+        // 如果没有有效订单，直接返回0
+        if (validOrderCount == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        // 3. 重新构建查询，添加聚合函数
+        queryWrapper.select("SUM(payment_amount) as total");
+
+        // 4. 执行查询
+        List<Map<String, Object>> results = orderMapper.selectMaps(queryWrapper);
+        log.info("订单金额聚合查询结果：{}", results); // 打印原始查询结果
+
+        // 5. 处理查询结果
+        if (results != null && !results.isEmpty()) {
+            Map<String, Object> firstResult = results.get(0);
+            Object totalObj = firstResult.get("total");
+
+            // 详细日志：打印获取到的总和对象
+            log.info("从查询结果中获取到的总金额对象：{}，类型：{}",
+                    totalObj, totalObj != null ? totalObj.getClass() : "null");
+
+            if (totalObj != null) {
+                // 处理可能的数字类型转换
+                if (totalObj instanceof Number) {
+                    return BigDecimal.valueOf(((Number) totalObj).doubleValue());
+                } else {
+                    // 尝试字符串转换
+                    return new BigDecimal(totalObj.toString());
+                }
+            } else {
+                log.warn("聚合查询结果中total字段为null");
+            }
+        } else {
+            log.warn("聚合查询返回空结果");
+        }
+
+        return BigDecimal.ZERO;
+    }
+
 
     /**
      * 统计指定时间段内的订单总金额（复用已有方法）
@@ -1000,6 +1081,78 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
         // 4. 保存更新
         orderMapper.updateById(order);
         return convertToOrderVO(order);
+    }
+
+    /**
+     * 获取销量Top10的商品统计数据
+     *
+     * @param timeRange 时间范围（可选，如"30天"、"90天"、"all"，默认all）
+     * @return 销量Top10统计结果
+     */
+    @Override
+    public ProductSalesTop10VO getTop10ProductSales(String timeRange) {
+        // 1. 处理时间范围参数，默认统计全部时间
+        String actualTimeRange = timeRange == null ? "all" : timeRange;
+        LocalDateTime startTime = null;
+
+        // 根据时间范围计算起始时间
+        if ("30天".equals(actualTimeRange)) {
+            startTime = LocalDateTime.now().minusDays(30);
+        } else if ("90天".equals(actualTimeRange)) {
+            startTime = LocalDateTime.now().minusDays(90);
+        } else if ("365天".equals(actualTimeRange)) {
+            startTime = LocalDateTime.now().minusDays(365);
+        }
+        // "all" 或其他值则不限制时间范围
+
+        // 2. 构建查询条件（关联订单表和订单商品表，过滤有效订单）
+        QueryWrapper<OrderItem> queryWrapper = new QueryWrapper<>();
+        // 关联订单表，只统计已支付或已完成的有效订单
+        queryWrapper.inSql("order_id",
+                "SELECT id FROM `order` WHERE status IN (1,2,3) AND is_delete = 0" +
+                        (startTime != null ? " AND create_time >= '" + startTime + "'" : ""));
+        // 排除已删除的订单项
+        queryWrapper.eq("is_delete", 0);
+
+        // 3. 按商品分组统计销量和金额
+        queryWrapper.select(
+                "product_id",
+                "product_name",
+                "product_image",
+                "current_price",
+                "SUM(quantity) as total_sales",
+                "SUM(total_price) as total_sales_amount"
+        );
+        queryWrapper.groupBy("product_id", "product_name", "product_image", "current_price");
+        // 按销量降序排序，取前10
+        queryWrapper.orderByDesc("total_sales");
+
+        // 4. 执行查询（如果有时间范围，额外过滤订单项创建时间）
+        if (startTime != null) {
+            queryWrapper.ge("create_time", startTime);
+        }
+
+        List<Map<String, Object>> productSalesMaps = orderItemMapper.selectMaps(queryWrapper);
+
+        // 5. 转换结果为VO列表
+        List<ProductSalesVO> productSalesVOList = productSalesMaps.stream().map(map -> {
+                    ProductSalesVO vo = new ProductSalesVO();
+                    vo.setProductId(((Number) map.get("product_id")).longValue());
+                    vo.setProductName((String) map.get("product_name"));
+                    vo.setProductImage((String) map.get("product_image"));
+                    vo.setCurrentPrice(new BigDecimal(map.get("current_price").toString()));
+                    vo.setTotalSales(((Number) map.get("total_sales")).intValue());
+                    vo.setTotalSalesAmount(new BigDecimal(map.get("total_sales_amount").toString()));
+                    return vo;
+                }).limit(10) // 确保只取前10
+                .collect(Collectors.toList());
+
+        // 6. 封装返回结果
+        ProductSalesTop10VO resultVO = new ProductSalesTop10VO();
+        resultVO.setTop10Products(productSalesVOList);
+        resultVO.setTimeRange("all".equals(actualTimeRange) ? "全部时间" : actualTimeRange);
+
+        return resultVO;
     }
 
     /**

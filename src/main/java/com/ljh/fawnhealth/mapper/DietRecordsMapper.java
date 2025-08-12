@@ -3,6 +3,7 @@ package com.ljh.fawnhealth.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ljh.fawnhealth.model.entity.DietRecords;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.Date;
 import java.util.List;
@@ -15,6 +16,16 @@ import java.util.List;
 */
 public interface DietRecordsMapper extends BaseMapper<DietRecords> {
     List<DietRecords> selectByUserIdAndDate(@Param("userId") Long userId, @Param("recordDate") Date recordDate);
+
+    @Select("SELECT * FROM diet_records " +
+            "WHERE user_id = #{userId} " +
+            "AND record_date BETWEEN #{startDate} AND #{endDate} " +
+            "AND is_delete = 0 " +
+            "ORDER BY record_date, meal_type")
+    List<DietRecords> selectByUserIdAndDateRange(@Param("userId") Long userId,
+                                                 @Param("startDate") Date startDate,
+                                                 @Param("endDate") Date endDate);
+
 }
 
 

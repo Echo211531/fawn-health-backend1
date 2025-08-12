@@ -4,10 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
 import com.ljh.fawnhealth.model.dto.order.*;
-import com.ljh.fawnhealth.model.vo.order.OrderAmountStatisticsVO;
-import com.ljh.fawnhealth.model.vo.order.OrderChartVO;
-import com.ljh.fawnhealth.model.vo.order.OrderStatisticsVO;
-import com.ljh.fawnhealth.model.vo.order.OrderVO;
+import com.ljh.fawnhealth.model.vo.order.*;
 import com.ljh.fawnhealth.service.OrderService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +68,7 @@ public class OrderController {
     }
 
     /**
-     * 订单统计接口
+     * 订单统计接口(总的订单数量)
      * 获取今日、昨日订单数量及日环比增长率
      *
      * @return 订单统计结果VO
@@ -178,6 +175,21 @@ public class OrderController {
         log.info("管理员审核退款申请：{}", auditDTO);
         OrderVO orderVO = orderService.auditRefund(auditDTO);
         return ResultUtils.success(orderVO);
+    }
+
+    /**
+     * 商品销量Top10统计接口
+     * 获取购买量前10的商品信息及销量数据
+     *
+     * @param timeRange 时间范围（可选，支持"30天"、"90天"、"365天"、"all"，默认all）
+     * @return 销量Top10统计结果
+     */
+    @GetMapping("/statistics/top10Products")
+    public BaseResponse<ProductSalesTop10VO> getTop10ProductSales(
+            @RequestParam(required = false, defaultValue = "all") String timeRange) {
+        log.info("查询商品销量Top10，时间范围：{}", timeRange);
+        ProductSalesTop10VO salesTop10VO = orderService.getTop10ProductSales(timeRange);
+        return ResultUtils.success(salesTop10VO);
     }
 
 }

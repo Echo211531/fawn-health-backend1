@@ -122,4 +122,10 @@ public interface UserService extends IService<User> {
      * @return 更新后的管理员信息
      */
     User updateAdminInfo(Long adminId, AdminUpdateDTO adminUpdateDTO);
+
+    /**
+     * 获取用户性别分布统计数据
+     * @return 性别分布统计VO
+     */
+    UserGenderStatisticsVO getGenderDistributionStatistics();
 }

@@ -246,7 +246,7 @@ public class UserController {
     }
 
     /**
-     * 用户登录数据统计
+     * 用户登录数据统计（获取总的登录成功数量）
      * 获取今日、昨日登录用户数及日环比增长率
      *
      * @return 统计结果VO
@@ -321,6 +321,18 @@ public class UserController {
 
         User updatedAdmin = userService.updateAdminInfo(adminId, adminUpdateDTO);
         return ResultUtils.success(updatedAdmin);
+    }
+
+    /**
+     * 用户性别分布统计
+     * 获取各性别的用户数量分布，用于前端饼图展示
+     *
+     * @return 性别分布统计结果VO
+     */
+    @GetMapping("/statistics/gender")
+    public BaseResponse<UserGenderStatisticsVO> getGenderDistribution() {
+        UserGenderStatisticsVO statisticsVO = userService.getGenderDistributionStatistics();
+        return ResultUtils.success(statisticsVO);
     }
 
 }
