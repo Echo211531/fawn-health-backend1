@@ -10,6 +10,13 @@ import java.time.LocalDateTime;
  */
 @Data
 public class OrderAmountStatisticsVO {
+
+    /**
+     * 全部订单总金额
+     */
+    private BigDecimal OrderTotalAmount;
+
+
     /**
      * 今日订单总金额
      */

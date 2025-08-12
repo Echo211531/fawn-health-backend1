@@ -9,6 +9,12 @@ import java.time.LocalDateTime;
  */
 @Data
 public class OrderStatisticsVO {
+
+    /**
+     * 总的订单数量
+     */
+    private long orderTotal;
+
     /**
      * 今日订单数量
      */

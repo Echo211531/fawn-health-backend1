@@ -71,7 +71,7 @@ public class OrderController {
     }
 
     /**
-     * 订单统计接口
+     * 订单统计接口(总的订单数量)
      * 获取今日、昨日订单数量及日环比增长率
      *
      * @return 订单统计结果VO

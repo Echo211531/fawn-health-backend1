@@ -524,3 +524,74 @@ ALTER TABLE `order`
 
 ALTER TABLE `order`
     ADD COLUMN `refund_reject_reason` varchar(500) COMMENT '退款驳回原因：审核驳回时记录具体原因';
+
+SHOW INDEX FROM cart;
+-- 删除user_id和product_id的唯一复合索引
+DROP INDEX idx_user_product ON cart;
+-- 添加普通复合索引，不包含唯一性约束
+CREATE INDEX idx_user_product ON cart(user_id, product_id);
+
+-- 健康评估记录表
+CREATE TABLE `health_assessment` (
+                                     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增长',
+                                     `user_id` BIGINT NOT NULL COMMENT '关联的用户ID，对应user表的id',
+                                     `score` TINYINT COMMENT '健康综合评分，范围0-100，分数越高表示健康状况越好',
+                                     `weight_trend` DECIMAL(5,2) COMMENT '体重变化趋势(kg/周)，正数表示增重，负数表示减重',
+                                     `calorie_balance` DECIMAL(8,2) COMMENT '每日热量平衡值(kcal)，正数表示热量盈余，负数表示热量缺口',
+                                     `nutrition_score` TINYINT COMMENT '营养均衡评分(0-100)，评估蛋白质、脂肪、碳水化合物的摄入平衡性',
+                                     `diet_advice` TEXT COMMENT '系统生成的个性化饮食建议文本',
+                                     `exercise_advice` TEXT COMMENT '系统生成的个性化运动建议文本',
+                                     `assessment_date` DATE NOT NULL COMMENT '评估日期（仅日期部分）',
+                                     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+                                     PRIMARY KEY (`id`),
+                                     UNIQUE KEY `idx_user_date` (`user_id`, `assessment_date`) COMMENT '用户ID和评估日期的唯一索引，确保每天只评估一次'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户健康评估每日记录表';
+
+-- 健康报告表
+CREATE TABLE `health_report` (
+                                 `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增长',
+                                 `user_id` BIGINT NOT NULL COMMENT '关联的用户ID，对应user表的id',
+                                 `report_type` TINYINT NOT NULL COMMENT '报告类型：1-周报，2-月报',
+                                 `content` JSON COMMENT '报告内容JSON格式，包含图表数据、趋势分析等结构化数据',
+                                 `start_date` DATE NOT NULL COMMENT '报告统计周期开始日期',
+                                 `end_date` DATE NOT NULL COMMENT '报告统计周期结束日期',
+                                 `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '报告生成时间',
+                                 PRIMARY KEY (`id`),
+                                 KEY `idx_user_type` (`user_id`, `report_type`) COMMENT '用户ID和报告类型的联合索引，用于快速查询',
+                                 KEY `idx_time_range` (`start_date`, `end_date`) COMMENT '时间范围查询索引'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户健康分析报告表';
+
+-- 建议规则表
+CREATE TABLE `advice_rules` (
+                                `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '规则ID',
+                                `condition_expr` VARCHAR(200) NOT NULL COMMENT '条件表达式，如: score<60 AND weight_trend>0.5',
+                                `advice_type` TINYINT NOT NULL COMMENT '建议类型：1-饮食，2-运动',
+                                `advice_text` TEXT NOT NULL COMMENT '建议内容文本',
+                                `priority` TINYINT DEFAULT 5 COMMENT '优先级(1-10)，数值越小优先级越高',
+                                `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                PRIMARY KEY (`id`),
+                                KEY `idx_priority` (`priority`) COMMENT '优先级索引'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康建议规则表';
+
+CREATE TABLE `user_weight_history` (
+                                       `id` BIGINT NOT NULL AUTO_INCREMENT,
+                                       `user_id` BIGINT NOT NULL COMMENT '用户ID',
+                                       `weight` DECIMAL(5,2) NOT NULL COMMENT '体重(kg)',
+                                       `record_date` DATE NOT NULL COMMENT '记录日期',
+                                       `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                       PRIMARY KEY (`id`),
+                                       UNIQUE KEY `idx_user_date` (`user_id`, `record_date`),
+                                       KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户体重历史记录';
+
+CREATE TABLE `user_login_log` (
+                             `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+                             `user_id` bigint NOT NULL COMMENT '用户ID，关联user表的id',
+                             `login_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+                             `login_status` tinyint NOT NULL DEFAULT '1' COMMENT '登录状态：1-成功，0-失败',
+                             `fail_reason` varchar(255) DEFAULT NULL COMMENT '登录失败原因（如密码错误、账号锁定等）',
+                             PRIMARY KEY (`id`),
+                             KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引，用于查询指定用户的登录记录',
+                             KEY `idx_login_time` (`login_time`) COMMENT '登录时间索引，用于按时间范围统计',
+                             KEY `idx_user_time` (`user_id`, `login_time`) COMMENT '用户+时间复合索引，优化统计查询'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户登录日志表';

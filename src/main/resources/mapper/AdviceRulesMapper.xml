@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ljh.fawnhealth.mapper.AdviceRulesMapper">
+
+    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.AdviceRules">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="conditionExpr" column="condition_expr" jdbcType="VARCHAR"/>
+            <result property="adviceType" column="advice_type" jdbcType="TINYINT"/>
+            <result property="adviceText" column="advice_text" jdbcType="VARCHAR"/>
+            <result property="priority" column="priority" jdbcType="TINYINT"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,condition_expr,advice_type,
+        advice_text,priority,create_time
+    </sql>
+</mapper>

@@ -11,12 +11,16 @@ import com.ljh.fawnhealth.constant.JwtClaimsConstant;
 import com.ljh.fawnhealth.context.BaseContext;
 import com.ljh.fawnhealth.exception.BusinessException;
 import com.ljh.fawnhealth.exception.ErrorCode;
+import com.ljh.fawnhealth.mapper.UserLoginLogMapper;
 import com.ljh.fawnhealth.mapper.UserMapper;
+import com.ljh.fawnhealth.mapper.UserWeightHistoryMapper;
 import com.ljh.fawnhealth.model.dto.user.AdminAddDTO;
 import com.ljh.fawnhealth.model.dto.user.AdminUpdateDTO;
 import com.ljh.fawnhealth.model.dto.user.UserPageQueryDTO;
 import com.ljh.fawnhealth.model.dto.user.UserUpdateDTO;
 import com.ljh.fawnhealth.model.entity.User;
+import com.ljh.fawnhealth.model.entity.UserLoginLog;
+import com.ljh.fawnhealth.model.entity.UserWeightHistory;
 import com.ljh.fawnhealth.model.enums.user.UserRole;
 import com.ljh.fawnhealth.model.vo.user.*;
 import com.ljh.fawnhealth.service.UserService;
@@ -55,7 +59,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     private UserMapper userMapper;
 
     @Resource
+    private UserWeightHistoryMapper userWeightHistoryMapper;
+
+    @Resource
     private JwtProperties jwtProperties; // 用于读取JWT配置（需配置此Bean）
+
+    @Resource
+    private UserLoginLogMapper userLoginLogMapper;
 
     // 基础代谢计算系数
     private static final BigDecimal MALE_FACTOR = new BigDecimal("10");
@@ -77,11 +87,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public UserLoginVO findUserByEmail(String email, String loginIp,HttpServletRequest request) {
+    public UserLoginVO findUserByEmail(String email, String loginIp, HttpServletRequest request) {
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(User::getEmail, email);
         User user = userMapper.selectOne(queryWrapper);
 
+        // 登录状态默认设为成功
+        int loginStatus = 1;
+        String failReason = null;
 
         if (user == null) {
             user = new User();
@@ -96,21 +109,48 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             user.setCreateTime(new Date());
         }
 
-        if(user.getStatus() == 0){
-            throw  new BusinessException(ErrorCode.PARAMS_ERROR, "账号被封禁，请联系管理员");
+        try {
+            if (user.getStatus() == 0) {
+                // 账号被封禁时设置登录失败状态和原因
+                loginStatus = 0;
+                failReason = "账号被封禁，请联系管理员";
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, failReason);
+            }
+
+            // 每次登录都更新以下字段
+            user.setLastLoginTime(new Date());
+            user.setLastLoginIp(loginIp);
+            user.setUpdateTime(new Date());
+
+            // 插入或更新数据库
+            if (user.getId() == null) {
+                userMapper.insert(user);
+            } else {
+                userMapper.updateById(user);
+            }
+        } catch (BusinessException e) {
+            // 如果是已知业务异常，保持之前设置的失败原因
+            if (failReason == null) {
+                loginStatus = 0;
+                failReason = e.getMessage();
+            }
+            throw e; // 重新抛出异常，不影响原有业务流程
+        } catch (Exception e) {
+            // 处理其他未知异常
+            loginStatus = 0;
+            failReason = "登录过程发生未知错误: " + e.getMessage();
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, failReason);
+        } finally {
+            // 无论登录成功与否，都记录登录日志
+            UserLoginLog loginLog = new UserLoginLog();
+            loginLog.setUserId(user.getId());
+            loginLog.setLoginTime(new Date());
+            loginLog.setLoginStatus(loginStatus);
+            loginLog.setFailReason(failReason);
+            // 插入登录日志
+            userLoginLogMapper.insert(loginLog);
         }
 
-        // 每次登录都更新以下字段
-        user.setLastLoginTime(new Date());
-        user.setLastLoginIp(loginIp);
-        user.setUpdateTime(new Date());
-
-        // 插入或更新数据库
-        if (user.getId() == null) {
-            userMapper.insert(user);
-        } else {
-            userMapper.updateById(user);
-        }
         // 生成 Token
         Map<String, Object> claims = new HashMap<>();
         claims.put(JwtClaimsConstant.USER_ID, user.getId());
@@ -125,7 +165,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 构建返回对象
         UserLoginVO vo = new UserLoginVO();
         BeanUtils.copyProperties(user, vo);
-        log.info("用户id是：{}",vo.getId());
+        log.info("用户id是：{}", vo.getId());
         vo.setToken(token);
 
         return vo;
@@ -245,6 +285,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         updateUser.setTargetWeight(targetWeight);
         updateUser.setBmi(bmi);
         updateUser.setDailyCalories(dailyCalories);
+
+        // 记录体重历史
+        UserWeightHistory history = new UserWeightHistory();
+        history.setUserId(userId);
+        history.setWeight(weight);
+        history.setRecordDate(new Date());
+        userWeightHistoryMapper.insert(history);
 
         // 执行更新
         int rows = userMapper.updateById(updateUser);
@@ -562,6 +609,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 获取当前时间（上海时区）
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
 
+        // 1. 总用户数：所有有效注册用户的总数
+        long userTotal = countTotalUsers ();
+
         // 1. 今日新增用户
         LocalDateTime todayStart = now.with(LocalTime.MIN);
         LocalDateTime todayEnd = now;
@@ -586,9 +636,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         statisticsVO.setYesterdayNewUsers(yesterdayNewUsers);
         statisticsVO.setMonthNewUsers(monthNewUsers);
         statisticsVO.setDayOnDayRate(dayOnDayRate);
+        statisticsVO.setUserTotal(userTotal);
         statisticsVO.setStatisticTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
 
         return statisticsVO;
+    }
+
+    /**
+     * 统计总用户数（所有有效注册用户）
+     * @return
+     */
+    private long countTotalUsers () {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        return userMapper.selectCount (queryWrapper);
     }
 
     @Override
@@ -596,6 +656,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 使用上海时区确保时间准确性
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
 
+        long userTotal = countTotalLoginCount();
         // 1. 今日登录用户数：今日00:00:00至当前时间
         LocalDateTime todayStart = now.with(LocalTime.MIN);
         LocalDateTime todayEnd = now;
@@ -620,9 +681,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         statisticsVO.setYesterdayLoginUsers(yesterdayLoginUsers);
         statisticsVO.setMonthLoginUsers(monthLoginUsers);  // 设置新增字段
         statisticsVO.setDayOnDayRate(dayOnDayRate);
+        statisticsVO.setUserTotal(userTotal); // 总的用户登录成功数量
         statisticsVO.setStatisticTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
 
         return statisticsVO;
+    }
+
+    /**
+     * 统计总登录数量（所有成功登录的记录总数）
+     */
+    private long countTotalLoginCount() {
+        LambdaQueryWrapper<UserLoginLog> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserLoginLog::getLoginStatus, 1);  // 只统计成功登录的记录
+        return userLoginLogMapper.selectCount(queryWrapper);
     }
 
     /**

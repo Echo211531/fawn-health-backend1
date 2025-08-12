@@ -28,7 +28,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 只拦截后台接口，例如 /admin/** 或后台相关接口
         registry.addInterceptor(jwtTokenAdminInterceptor)
                 .addPathPatterns("/foodDiary/**", "/file/**", "/coupons/**", "/userCoupon/**","/communityPosts/**",
-                        "/foodLibrary/**","/vip/**", "/comment/**", "/ai/**","/product/**","/productCategory/**","/order/**","/address/**")
+                        "/foodLibrary/**","/vip/**", "/comment/**", "/ai/**","/product/**","/productCategory/**","/order/**",
+                        "/address/**","/health/**")
                 .excludePathPatterns(
                         "/user/login",
                         "/user/send",

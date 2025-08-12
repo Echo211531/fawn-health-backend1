@@ -9,6 +9,12 @@ import java.time.LocalDateTime;
  */
 @Data
 public class UserNewStatisticsVO {
+
+    /**
+     * 总用户数
+     */
+    private long userTotal;
+
     /**
      * 今日新增用户数
      */
