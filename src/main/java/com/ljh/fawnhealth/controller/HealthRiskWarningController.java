@@ -26,7 +26,6 @@ public class HealthRiskWarningController {
     @Resource
     private SseEmitterManager sseEmitterManager;
 
-
     @GetMapping("/user/{userId}")
     public BaseResponse<List<HealthRiskWarning>> listByUser(@PathVariable Long userId) {
         return ResultUtils.success(service.listByUser(userId));
@@ -47,6 +46,7 @@ public class HealthRiskWarningController {
 
     /**
      * 建立SSE连接，实时获取用户最新预警记录
+     * 
      * @param userId 用户ID
      * @return SSE连接对象
      */
@@ -71,4 +71,14 @@ public class HealthRiskWarningController {
 
         return emitter;
     }
+
+    /**
+     * 标记预警为已处理
+     */
+    @PostMapping("/{id}/process")
+    public BaseResponse<Boolean> processWarning(@PathVariable String id) {
+        boolean ok = service.markProcessed(id);
+        return ResultUtils.success(ok);
+    }
+
 }

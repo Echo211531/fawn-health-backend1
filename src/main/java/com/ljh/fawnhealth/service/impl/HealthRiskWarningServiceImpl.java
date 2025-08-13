@@ -45,6 +45,15 @@ public class HealthRiskWarningServiceImpl implements HealthRiskWarningService {
     }
 
     @Override
+    public boolean markProcessed(String id) {
+        HealthRiskWarning update = new HealthRiskWarning();
+        update.setId(id);
+        update.setStatus(1);
+        update.setProcessTime(LocalDateTime.now());
+        return mapper.updateById(update) > 0;
+    }
+
+    @Override
     public List<HealthRiskWarning> getLatestUnprocessedByUser(Long userId, int limit) {
         LambdaQueryWrapper<HealthRiskWarning> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(HealthRiskWarning::getUserId, userId)

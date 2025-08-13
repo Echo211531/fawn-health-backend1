@@ -15,5 +15,15 @@ public interface HealthRiskWarningService {
 
     List<HealthRiskWarning> listUnprocessed();
 
-    List<HealthRiskWarning> getLatestUnprocessedByUser(Long userId, int i);
+    /**
+     * 标记指定预警为已处理，并设置处理时间
+     * 
+     * @return true 表示成功更新；false 表示未更新（可能已处理或不存在）
+     */
+    boolean markProcessed(String id);
+
+    /**
+     * 获取用户最近的未处理预警记录（按触发时间倒序，限制条数）
+     */
+    List<HealthRiskWarning> getLatestUnprocessedByUser(Long userId, int limit);
 }
