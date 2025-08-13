@@ -25,7 +25,7 @@ public class MessageProducer {
      * @param userCouponDTO
      */
     public void sendMessage(String exchange, String routingKey, UserCouponDTO userCouponDTO) {
-        log.info("发送点赞消息到 MQ: {}", userCouponDTO); // 添加日志
+        log.info("发送消息到 MQ: {}", userCouponDTO); // 添加日志
         rabbitTemplate.convertAndSend(exchange, routingKey, userCouponDTO);
     }
 
@@ -37,7 +37,7 @@ public class MessageProducer {
      * @param message
      */
     public void sendMessage(String exchange, String routingKey, Object message) {
-        log.info("发送点赞消息到 MQ: {}", message); // 添加日志
+        log.info("发送消息到 MQ: {}", message); // 添加日志
         rabbitTemplate.convertAndSend(exchange, routingKey, message);
     }
 

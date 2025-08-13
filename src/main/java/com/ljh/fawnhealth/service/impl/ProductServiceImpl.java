@@ -593,6 +593,54 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product>
             // 通知失败不影响主流程，仅记录日志
         }
     }
+
+    /**
+     * 每10秒执行一次：检测库存为0的商品并自动下架
+     * cron表达式：秒 分 时 日 月 周（每10秒触发一次）
+     */
+    @Scheduled(cron = "*/10 * * * * ?")
+    @Transactional(rollbackFor = Exception.class)
+    public void auto下架库存为0商品() {
+        log.info("开始执行库存为0商品自动下架定时任务...");
+
+        // 1. 查询符合条件的商品：库存为0 + 未删除 + 状态不是下架（状态为1上架或2缺货）
+        LambdaQueryWrapper<Product> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Product::getStock, 0)                // 库存为0
+                .eq(Product::getIsDelete, 0)             // 未删除
+                .in(Product::getStatus, 1, 2);           // 状态为上架(1)或缺货(2)
+
+        List<Product> products = productMapper.selectList(queryWrapper);
+
+        if (products.isEmpty()) {
+            log.info("未发现需要下架的库存为0商品，任务结束");
+            return;
+        }
+
+        // 2. 批量更新商品状态为下架（0）
+        int count = 0;
+        for (Product product : products) {
+            // 记录原状态用于日志
+            Integer oldStatus = product.getStatus();
+
+            // 更新状态为下架
+            Product updateProduct = new Product();
+            updateProduct.setId(product.getId());
+            updateProduct.setStatus(0); // 0表示下架状态
+
+            int rows = productMapper.updateById(updateProduct);
+            if (rows > 0) {
+                count++;
+                log.info("商品自动下架成功，商品ID: {}, 名称: {}, 原状态: {}({})",
+                        product.getId(),
+                        product.getName(),
+                        oldStatus,
+                        oldStatus == 1 ? "上架" : "缺货");
+            }
+        }
+
+        log.info("库存为0商品自动下架任务执行完成，共处理 {} 个商品，成功下架 {} 个",
+                products.size(), count);
+    }
 }
 
 

@@ -14,4 +14,6 @@ public interface HealthRiskWarningService {
     List<HealthRiskWarning> listByUserAndTimeRange(Long userId, LocalDateTime start, LocalDateTime end);
 
     List<HealthRiskWarning> listUnprocessed();
+
+    List<HealthRiskWarning> getLatestUnprocessedByUser(Long userId, int i);
 }

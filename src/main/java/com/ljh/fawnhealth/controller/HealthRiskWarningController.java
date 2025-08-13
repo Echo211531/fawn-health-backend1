@@ -1,38 +1,74 @@
 package com.ljh.fawnhealth.controller;
 
+import com.ljh.fawnhealth.commen.BaseResponse;
+import com.ljh.fawnhealth.config.ResultUtils;
+import com.ljh.fawnhealth.manager.sse.SseEmitterManager;
 import com.ljh.fawnhealth.model.entity.HealthRiskWarning;
 import com.ljh.fawnhealth.service.HealthRiskWarningService;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/health-warnings")
 public class HealthRiskWarningController {
 
-    private final HealthRiskWarningService service;
+    @Resource
+    private HealthRiskWarningService service;
 
-    public HealthRiskWarningController(HealthRiskWarningService service) {
-        this.service = service;
-    }
+    @Resource
+    private SseEmitterManager sseEmitterManager;
+
 
     @GetMapping("/user/{userId}")
-    public List<HealthRiskWarning> listByUser(@PathVariable Long userId) {
-        return service.listByUser(userId);
+    public BaseResponse<List<HealthRiskWarning>> listByUser(@PathVariable Long userId) {
+        return ResultUtils.success(service.listByUser(userId));
     }
 
     @GetMapping("/user/{userId}/range")
-    public List<HealthRiskWarning> listByUserAndRange(
+    public BaseResponse<List<HealthRiskWarning>> listByUserAndRange(
             @PathVariable Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
-        return service.listByUserAndTimeRange(userId, start, end);
+        return ResultUtils.success(service.listByUserAndTimeRange(userId, start, end));
     }
 
     @GetMapping("/unprocessed")
-    public List<HealthRiskWarning> listUnprocessed() {
-        return service.listUnprocessed();
+    public BaseResponse<List<HealthRiskWarning>> listUnprocessed() {
+        return ResultUtils.success(service.listUnprocessed());
+    }
+
+    /**
+     * 建立SSE连接，实时获取用户最新预警记录
+     * @param userId 用户ID
+     * @return SSE连接对象
+     */
+    @GetMapping("/sse/subscribe/{userId}")
+    public SseEmitter subscribeToWarnings(@PathVariable Long userId) {
+        // 创建SSE连接并存储
+        SseEmitter emitter = sseEmitterManager.createEmitter(userId);
+
+        // 可选：连接建立后立即推送最近的1条未处理预警（优化用户体验）
+        List<HealthRiskWarning> latestWarnings = service.getLatestUnprocessedByUser(userId, 1);
+        if (!latestWarnings.isEmpty()) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("initialWarning")
+                        .data(latestWarnings.get(0)));
+            } catch (IOException e) {
+                // 发送初始数据失败不影响连接建立
+                e.printStackTrace();
+                log.info("sse获取数据失败");
+            }
+        }
+
+        return emitter;
     }
 }

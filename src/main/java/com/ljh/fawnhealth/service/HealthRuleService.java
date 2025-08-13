@@ -1,5 +1,7 @@
 package com.ljh.fawnhealth.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.ljh.fawnhealth.model.dto.healthRule.HealthRuleAddDTO;
 import com.ljh.fawnhealth.model.entity.HealthRule;
 
 import java.util.List;
@@ -12,7 +14,7 @@ public interface HealthRuleService {
     /**
      * 创建健康规则
      */
-    HealthRule createRule(HealthRule rule);
+    HealthRule createRule(HealthRuleAddDTO rule);
 
     /**
      * 更新健康规则
@@ -27,7 +29,7 @@ public interface HealthRuleService {
     /**
      * 获取所有规则
      */
-    List<HealthRule> getAllRules();
+    IPage<HealthRule> getRulesByCondition(String id, String name, Integer enabled, Integer pageNum, Integer pageSize);
 
     /**
      * 获取所有启用的规则

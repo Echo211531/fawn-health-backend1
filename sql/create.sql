@@ -595,3 +595,53 @@ CREATE TABLE `user_login_log` (
                              KEY `idx_login_time` (`login_time`) COMMENT '登录时间索引，用于按时间范围统计',
                              KEY `idx_user_time` (`user_id`, `login_time`) COMMENT '用户+时间复合索引，优化统计查询'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户登录日志表';
+
+CREATE TABLE IF NOT EXISTS health_rules (
+                                            id              varchar(64)   NOT NULL COMMENT '规则ID',
+                                            name            varchar(255)  NOT NULL COMMENT '规则名称',
+                                            description     text          NULL COMMENT '规则描述',
+                                            condition_expr  text          NOT NULL COMMENT '触发条件MVEL表达式',
+                                            risk_type       varchar(64)   NOT NULL COMMENT '风险类型',
+                                            priority        int           NOT NULL DEFAULT 0 COMMENT '优先级，越小越高',
+                                            enabled         tinyint(1)    NOT NULL DEFAULT 1 COMMENT '是否启用 0否 1是',
+                                            create_time     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                            update_time     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                            PRIMARY KEY (id),
+                                            KEY idx_health_rules_enabled (enabled),
+                                            KEY idx_health_rules_risk_type (risk_type),
+                                            KEY idx_health_rules_priority (priority)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康规则表';
+
+CREATE TABLE IF NOT EXISTS health_risk_warnings (
+                                                    id                     varchar(64)   NOT NULL COMMENT '预警ID',
+                                                    user_id                bigint        NOT NULL COMMENT '用户ID',
+                                                    risk_type              varchar(64)   NOT NULL COMMENT '风险类型',
+                                                    rule_id                varchar(64)   NULL COMMENT '触发规则ID',
+                                                    trigger_data           text          NULL COMMENT '触发时数据快照(JSON字符串)',
+                                                    intervention_content   text          NULL COMMENT '干预方案内容',
+                                                    status                 tinyint       NOT NULL DEFAULT 0 COMMENT '状态：0未处理 1已处理',
+                                                    trigger_time           datetime      NOT NULL COMMENT '触发时间',
+                                                    process_time           datetime      NULL COMMENT '处理时间',
+                                                    create_time            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                                    PRIMARY KEY (id),
+                                                    KEY idx_warnings_user (user_id),
+                                                    KEY idx_warnings_risk_type (risk_type),
+                                                    KEY idx_warnings_status (status),
+                                                    KEY idx_warnings_trigger_time (trigger_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康风险预警记录表';
+
+CREATE TABLE IF NOT EXISTS intervention_plans (
+                                                  id                varchar(64)   NOT NULL COMMENT '主键ID',
+                                                  risk_type         varchar(64)   NOT NULL COMMENT '风险类型',
+                                                  title             varchar(255)  NOT NULL COMMENT '干预方案标题',
+                                                  content           text          NULL COMMENT '干预方案内容',
+                                                  intervention_type varchar(32)   NULL COMMENT '方案类型：DIET/EXERCISE/LIFESTYLE',
+                                                  target_audience   varchar(255)  NULL COMMENT '适用人群',
+                                                  expected_outcome  varchar(255)  NULL COMMENT '预期效果',
+                                                  precautions       varchar(512)  NULL COMMENT '注意事项',
+                                                  enabled           tinyint(1)    NOT NULL DEFAULT 1 COMMENT '是否启用',
+                                                  create_time       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                                  update_time       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                                  PRIMARY KEY (id),
+                                                  KEY idx_plan_risk_enabled (risk_type, enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康干预方案表';

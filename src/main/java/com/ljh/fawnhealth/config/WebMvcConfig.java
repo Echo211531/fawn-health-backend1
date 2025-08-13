@@ -29,7 +29,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(jwtTokenAdminInterceptor)
                 .addPathPatterns("/foodDiary/**", "/file/**", "/coupons/**", "/userCoupon/**","/communityPosts/**",
                         "/foodLibrary/**","/vip/**", "/comment/**", "/ai/**","/product/**","/productCategory/**","/order/**",
-                        "/address/**","/health/**")
+                        "/address/**","/health/**","/rules/**","/health-warnings/**")
                 .excludePathPatterns(
                         "/user/login",
                         "/user/send",
