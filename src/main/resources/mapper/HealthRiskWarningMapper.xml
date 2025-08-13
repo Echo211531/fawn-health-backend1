@@ -54,4 +54,13 @@
         ORDER BY trigger_time DESC
     </select>
 
+    <!-- 统计相同用户、相同干预内容且未处理的预警数量（用于去重） -->
+    <select id="countUnprocessedByUserAndIntervention" resultType="int">
+        SELECT COUNT(1)
+        FROM health_risk_warnings
+        WHERE user_id = #{userId}
+          AND intervention_content = #{interventionContent}
+          AND status = 0
+    </select>
+
 </mapper> 

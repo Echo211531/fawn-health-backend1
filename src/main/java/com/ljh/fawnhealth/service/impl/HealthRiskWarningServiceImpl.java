@@ -14,10 +14,18 @@ import java.util.List;
 public class HealthRiskWarningServiceImpl implements HealthRiskWarningService {
 
     @Resource
-    private  HealthRiskWarningMapper mapper;
+    private HealthRiskWarningMapper mapper;
 
     @Override
     public void save(HealthRiskWarning warning) {
+        // 入库前去重：同一用户、相同干预内容且未处理的记录存在，则不插入
+        if (warning.getUserId() != null && warning.getInterventionContent() != null) {
+            int exists = mapper.countUnprocessedByUserAndIntervention(warning.getUserId(),
+                    warning.getInterventionContent());
+            if (exists > 0) {
+                return;
+            }
+        }
         mapper.insert(warning);
     }
 
@@ -40,9 +48,9 @@ public class HealthRiskWarningServiceImpl implements HealthRiskWarningService {
     public List<HealthRiskWarning> getLatestUnprocessedByUser(Long userId, int limit) {
         LambdaQueryWrapper<HealthRiskWarning> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(HealthRiskWarning::getUserId, userId)
-                .eq(HealthRiskWarning::getStatus, 0)  // 0表示未处理
-                .orderByDesc(HealthRiskWarning::getTriggerTime)  // 按触发时间倒序
-                .last("LIMIT " + limit);  // 限制返回数量
+                .eq(HealthRiskWarning::getStatus, 0)
+                .orderByDesc(HealthRiskWarning::getTriggerTime)
+                .last("LIMIT " + limit);
         return mapper.selectList(wrapper);
     }
 }

@@ -34,4 +34,10 @@ public interface HealthRiskWarningMapper extends BaseMapper<HealthRiskWarning> {
      * 根据风险类型查询预警记录
      */
     List<HealthRiskWarning> selectByRiskType(@Param("riskType") String riskType);
+
+    /**
+     * 统计相同用户、相同干预内容且未处理的预警数量（用于去重）
+     */
+    int countUnprocessedByUserAndIntervention(@Param("userId") Long userId,
+            @Param("interventionContent") String interventionContent);
 }
