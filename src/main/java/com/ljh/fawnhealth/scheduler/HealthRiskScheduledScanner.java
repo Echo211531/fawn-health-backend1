@@ -31,7 +31,7 @@ public class HealthRiskScheduledScanner {
     }
 
     // 每小时扫描一次（可按需调整为每日固定时刻）
-    @Scheduled(cron = "0 0 * * * ?")
+    @Scheduled(cron = "*/10 * * * * ?")
     public void scanAllUsersAndEvaluate() {
         log.info("[HealthRiskScheduledScanner] 定时扫描开始");
         long pageNum = 1;
@@ -50,8 +50,7 @@ public class HealthRiskScheduledScanner {
                     List<HealthRiskWarningVO> warnings = ruleEngineService
                             .evaluateUserHealthRisk(String.valueOf(userId));
                     if (warnings != null && !warnings.isEmpty()) {
-                        messageProducer.sendMessage(MqConstant.FH_EXCHANGE_NAME, "fh.key.health.warning", warnings);
-                        log.info("[HealthRiskScheduledScanner] 用户{} 触发{}条预警，已推送MQ", userId, warnings.size());
+                        log.info("[HealthRiskScheduledScanner] 用户{} 触发{}条预警", userId, warnings.size());
                     }
                 } catch (Exception ex) {
                     log.error("[HealthRiskScheduledScanner] 评估用户{} 失败", userId, ex);
