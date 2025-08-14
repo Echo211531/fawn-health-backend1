@@ -36,7 +36,7 @@ public class RuleController {
 
     // 更新规则
     @PostMapping("/updateRule/{id}")
-    public BaseResponse<HealthRule> updateRule(@PathVariable String id, @RequestBody HealthRule rule) {
+    public BaseResponse<HealthRule> updateRule(@PathVariable Long id, @RequestBody HealthRule rule) {
         rule.setId(id);
         HealthRule updatedRule = healthRuleService.updateRule(rule);
         ruleEngineService.reloadRules(); // 重新加载规则
