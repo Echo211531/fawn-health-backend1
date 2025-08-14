@@ -1,5 +1,6 @@
 package com.ljh.fawnhealth.model.enums.rule;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
  * 用于存储针对不同健康风险的个性化干预措施
  */
 @Document(collection = "intervention_plans")
+@TableName("intervention_plans")
 @Data
 public class InterventionPlan {
     @Id

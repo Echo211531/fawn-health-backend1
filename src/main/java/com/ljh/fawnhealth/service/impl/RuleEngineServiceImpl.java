@@ -197,27 +197,10 @@ public class RuleEngineServiceImpl implements RuleEngineService {
         try {
             List<InterventionPlan> plans = interventionPlanService.findEnabledByRiskType(riskType);
             if (plans != null && !plans.isEmpty()) {
-                // 简单取第一条，可扩展为AB测试或评分排序
                 return plans.get(0).getContent();
             }
-        } catch (Exception ignore) {
-        }
-        if ("DIABETES_RISK".equalsIgnoreCase(riskType)) {
-            return "建议减少精制碳水化合合物摄入，增加蔬菜和全谷物，每日运动30分钟";
-        }
-        if ("HYPERTENSION_RISK".equalsIgnoreCase(riskType)) {
-            return "建议减少钠盐摄入，多吃新鲜蔬菜水果，控制体重";
-        }
-        if ("OBESITY_RISK".equalsIgnoreCase(riskType)) {
-            return "建议控制总热量摄入，增加有氧运动，保持规律作息";
-        }
-        if ("CARDIOVASCULAR_RISK".equalsIgnoreCase(riskType)) {
-            return "建议减少饱和脂肪摄入，多吃鱼类和坚果，定期体检";
-        }
-        if ("NUTRITION_DEFICIENCY".equalsIgnoreCase(riskType)) {
-            return "建议均衡饮食，补充维生素和矿物质，咨询营养师";
-        }
-        return "建议咨询专业医生进行个性化指导";
+        } catch (Exception ignore) {}
+        return null;
     }
 
     @Override
