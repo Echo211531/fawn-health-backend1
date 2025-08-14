@@ -16,7 +16,7 @@ public interface InterventionPlanService {
 
     InterventionPlan update(InterventionPlan plan);
 
-    boolean delete(String id);
+    boolean delete(Long id);
 
     /**
      * 按条件查询
@@ -29,12 +29,12 @@ public interface InterventionPlanService {
     /**
      * 启用/禁用
      */
-    boolean toggle(String id, boolean enabled);
+    boolean toggle(Long id, boolean enabled);
 
     /**
      * 根据ID获取详情
      */
-    InterventionPlan getById(String id);
+    InterventionPlan getById(Long id);
 
     /**
      * 分页查询

@@ -21,7 +21,7 @@ public class HealthRule implements Serializable {
      * 规则ID
      */
     @TableId(type = IdType.ASSIGN_ID)
-    private String id;
+    private Long id;
 
     /**
      * 规则名称
@@ -52,6 +52,11 @@ public class HealthRule implements Serializable {
      * 是否启用
      */
     private Boolean enabled;
+
+    /**
+     * 逻辑删除标记：0未删除 1已删除
+     */
+    private Integer isDelete;
 
     /**
      * 创建时间

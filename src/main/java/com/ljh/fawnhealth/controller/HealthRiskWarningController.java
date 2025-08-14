@@ -76,9 +76,8 @@ public class HealthRiskWarningController {
      * 标记预警为已处理
      */
     @PostMapping("/{id}/process")
-    public BaseResponse<Boolean> processWarning(@PathVariable String id) {
+    public BaseResponse<Boolean> processWarning(@PathVariable Long id) {
         boolean ok = service.markProcessed(id);
         return ResultUtils.success(ok);
     }
-
 }

@@ -20,7 +20,7 @@ public interface HealthRiskWarningService {
      * 
      * @return true 表示成功更新；false 表示未更新（可能已处理或不存在）
      */
-    boolean markProcessed(String id);
+    boolean markProcessed(Long id);
 
     /**
      * 获取用户最近的未处理预警记录（按触发时间倒序，限制条数）

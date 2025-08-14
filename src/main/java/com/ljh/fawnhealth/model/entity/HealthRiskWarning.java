@@ -21,7 +21,7 @@ public class HealthRiskWarning implements Serializable {
      * 预警ID
      */
     @TableId(type = IdType.ASSIGN_ID)
-    private String id;
+    private Long id;
 
     /**
      * 用户ID
@@ -36,7 +36,7 @@ public class HealthRiskWarning implements Serializable {
     /**
      * 触发规则ID
      */
-    private String ruleId;
+    private Long ruleId;
 
     /**
      * 触发时的数据快照
@@ -62,6 +62,11 @@ public class HealthRiskWarning implements Serializable {
      * 处理时间
      */
     private LocalDateTime processTime;
+
+    /**
+     * 逻辑删除：0未删除 1已删除
+     */
+    private Integer isDelete;
 
     /**
      * 创建时间

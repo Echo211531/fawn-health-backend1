@@ -45,7 +45,7 @@ public class HealthRiskWarningServiceImpl implements HealthRiskWarningService {
     }
 
     @Override
-    public boolean markProcessed(String id) {
+    public boolean markProcessed(Long id) {
         HealthRiskWarning update = new HealthRiskWarning();
         update.setId(id);
         update.setStatus(1);

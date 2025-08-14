@@ -221,7 +221,8 @@ CREATE TABLE `diet_records` (
                                 PRIMARY KEY (`id`),
                                 KEY `idx_user_date` (`user_id`, `record_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='饮食记录主表';
-
+ALTER TABLE diet_records
+    ADD COLUMN total_calories DECIMAL(10,2) DEFAULT 0 COMMENT '总热量(kcal)';
 
 CREATE TABLE `diet_food_items` (
                                    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -584,18 +585,7 @@ CREATE TABLE `user_weight_history` (
                                        KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户体重历史记录';
 
-CREATE TABLE `user_login_log` (
-                             `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日志ID',
-                             `user_id` bigint NOT NULL COMMENT '用户ID，关联user表的id',
-                             `login_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
-                             `login_status` tinyint NOT NULL DEFAULT '1' COMMENT '登录状态：1-成功，0-失败',
-                             `fail_reason` varchar(255) DEFAULT NULL COMMENT '登录失败原因（如密码错误、账号锁定等）',
-                             PRIMARY KEY (`id`),
-                             KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引，用于查询指定用户的登录记录',
-                             KEY `idx_login_time` (`login_time`) COMMENT '登录时间索引，用于按时间范围统计',
-                             KEY `idx_user_time` (`user_id`, `login_time`) COMMENT '用户+时间复合索引，优化统计查询'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户登录日志表';
-
+-- 健康规则表
 CREATE TABLE IF NOT EXISTS health_rules (
                                             id              varchar(64)   NOT NULL COMMENT '规则ID',
                                             name            varchar(255)  NOT NULL COMMENT '规则名称',
@@ -612,6 +602,7 @@ CREATE TABLE IF NOT EXISTS health_rules (
                                             KEY idx_health_rules_priority (priority)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康规则表';
 
+-- 健康风险预警记录表
 CREATE TABLE IF NOT EXISTS health_risk_warnings (
                                                     id                     varchar(64)   NOT NULL COMMENT '预警ID',
                                                     user_id                bigint        NOT NULL COMMENT '用户ID',
@@ -630,18 +621,52 @@ CREATE TABLE IF NOT EXISTS health_risk_warnings (
                                                     KEY idx_warnings_trigger_time (trigger_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康风险预警记录表';
 
+-- 干预方案表（由Mongo迁移至MySQL）
 CREATE TABLE IF NOT EXISTS intervention_plans (
-                                                  id                varchar(64)   NOT NULL COMMENT '主键ID',
-                                                  risk_type         varchar(64)   NOT NULL COMMENT '风险类型',
-                                                  title             varchar(255)  NOT NULL COMMENT '干预方案标题',
-                                                  content           text          NULL COMMENT '干预方案内容',
-                                                  intervention_type varchar(32)   NULL COMMENT '方案类型：DIET/EXERCISE/LIFESTYLE',
-                                                  target_audience   varchar(255)  NULL COMMENT '适用人群',
-                                                  expected_outcome  varchar(255)  NULL COMMENT '预期效果',
-                                                  precautions       varchar(512)  NULL COMMENT '注意事项',
-                                                  enabled           tinyint(1)    NOT NULL DEFAULT 1 COMMENT '是否启用',
-                                                  create_time       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                                                  update_time       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                                                  PRIMARY KEY (id),
-                                                  KEY idx_plan_risk_enabled (risk_type, enabled)
+    id                varchar(64)   NOT NULL COMMENT '主键ID',
+    risk_type         varchar(64)   NOT NULL COMMENT '风险类型',
+    title             varchar(255)  NOT NULL COMMENT '干预方案标题',
+    content           text          NULL COMMENT '干预方案内容',
+    intervention_type varchar(32)   NULL COMMENT '方案类型：DIET/EXERCISE/LIFESTYLE',
+    target_audience   varchar(255)  NULL COMMENT '适用人群',
+    expected_outcome  varchar(255)  NULL COMMENT '预期效果',
+    precautions       varchar(512)  NULL COMMENT '注意事项',
+    enabled           tinyint(1)    NOT NULL DEFAULT 1 COMMENT '是否启用',
+    create_time       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    KEY idx_plan_risk_enabled (risk_type, enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康干预方案表';
+
+CREATE TABLE `user_login_log` (
+                                  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+                                  `user_id` bigint NOT NULL COMMENT '用户ID，关联user表的id',
+                                  `login_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+                                  `login_status` tinyint NOT NULL DEFAULT '1' COMMENT '登录状态：1-成功，0-失败',
+                                  `fail_reason` varchar(255) DEFAULT NULL COMMENT '登录失败原因（如密码错误、账号锁定等）',
+                                  PRIMARY KEY (`id`),
+                                  KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引，用于查询指定用户的登录记录',
+                                  KEY `idx_login_time` (`login_time`) COMMENT '登录时间索引，用于按时间范围统计',
+                                  KEY `idx_user_time` (`user_id`, `login_time`) COMMENT '用户+时间复合索引，优化统计查询'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户登录日志表';
+
+
+-- 1) 健康规则表
+ALTER TABLE health_rules
+    MODIFY COLUMN id BIGINT NOT NULL COMMENT '规则ID',
+    ADD COLUMN is_delete TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是' AFTER enabled;
+
+-- 2) 健康风险预警记录表
+ALTER TABLE health_risk_warnings
+    MODIFY COLUMN id BIGINT NOT NULL COMMENT '预警ID',
+    MODIFY COLUMN rule_id BIGINT NULL COMMENT '触发规则ID',
+    ADD COLUMN is_delete TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是' AFTER process_time;
+
+-- 可选外键（如需约束）：
+-- ALTER TABLE health_risk_warnings
+--   ADD CONSTRAINT fk_hrw_rule FOREIGN KEY (rule_id) REFERENCES health_rules(id);
+
+-- 3) 干预方案表
+ALTER TABLE intervention_plans
+    MODIFY COLUMN id BIGINT NOT NULL COMMENT '主键ID',
+    ADD COLUMN is_delete TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是' AFTER enabled;

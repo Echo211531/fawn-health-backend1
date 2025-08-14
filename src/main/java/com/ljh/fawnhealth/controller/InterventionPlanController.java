@@ -35,10 +35,10 @@ public class InterventionPlanController {
     }
 
     /**
-     * 删除干预方案
+     * 删除干预方案（逻辑删除）
      */
     @PostMapping("/delete")
-    public BaseResponse<Boolean> deletePlan(@RequestParam String id) {
+    public BaseResponse<Boolean> deletePlan(@RequestParam Long id) {
         return ResultUtils.success(interventionPlanService.delete(id));
     }
 
@@ -46,7 +46,7 @@ public class InterventionPlanController {
      * 获取干预方案详情
      */
     @GetMapping("/getDetail")
-    public BaseResponse<InterventionPlan> getDetail(@RequestParam String id) {
+    public BaseResponse<InterventionPlan> getDetail(@RequestParam Long id) {
         return ResultUtils.success(interventionPlanService.getById(id));
     }
 
@@ -60,7 +60,8 @@ public class InterventionPlanController {
     }
 
     /**
-     * 分页查询
+     * 分页查询，支持按riskType / enabled 过滤
+     * 若需根据预警ID过滤，请在DTO新增字段 warningId 后在服务层拼接对应条件
      */
     @PostMapping("/pageQuery")
     public BaseResponse<IPage<InterventionPlan>> pageQuery(@RequestBody InterventionPlanPageQueryDTO queryDTO) {
@@ -71,7 +72,7 @@ public class InterventionPlanController {
      * 启用/禁用
      */
     @PostMapping("/toggle")
-    public BaseResponse<Boolean> toggle(@RequestParam String id, @RequestParam boolean enabled) {
+    public BaseResponse<Boolean> toggle(@RequestParam Long id, @RequestParam boolean enabled) {
         return ResultUtils.success(interventionPlanService.toggle(id, enabled));
     }
 }

@@ -50,7 +50,7 @@ public class RuleEngineServiceImpl implements RuleEngineService {
     // 规则缓存
     private List<Rule> rules = new ArrayList<>();
     private Map<String, String> ruleNameByRiskType = new HashMap<>();
-    private Map<String, String> ruleIdByRiskType = new HashMap<>();
+    private Map<String, Long> ruleIdByRiskType = new HashMap<>();
 
     @PostConstruct
     public void init() {
@@ -184,7 +184,7 @@ public class RuleEngineServiceImpl implements RuleEngineService {
         HealthRiskWarningVO warning = new HealthRiskWarningVO();
         warning.setUserId(Long.valueOf(userId));
         warning.setRiskType(riskType);
-        warning.setRuleId(ruleIdByRiskType.get(riskType));
+        warning.setRuleId(String.valueOf(ruleIdByRiskType.get(riskType)));
         warning.setRuleName(ruleNameByRiskType.get(riskType));
         warning.setTriggerTime(LocalDateTime.now());
         warning.setTriggerData(facts.asMap());
@@ -199,7 +199,8 @@ public class RuleEngineServiceImpl implements RuleEngineService {
             if (plans != null && !plans.isEmpty()) {
                 return plans.get(0).getContent();
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         return null;
     }
 
