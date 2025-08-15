@@ -17,6 +17,11 @@ public class UserLoginVO {
     private Long id;
 
     /**
+     * 管理员登录用户名
+     */
+    private String userName;
+
+    /**
      * 邮箱
      */
     private String email;

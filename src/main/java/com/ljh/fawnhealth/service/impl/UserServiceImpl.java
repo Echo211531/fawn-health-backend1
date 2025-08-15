@@ -953,12 +953,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
         admin.setBirthday(adminUpdateDTO.getBirthday());
 
-        // 4.4 用户名校验（4-20位字母数字）
+        // 4.4 用户名校验
         if (adminUpdateDTO.getUsername() != null) {
             String username = adminUpdateDTO.getUsername().trim();
-            if (username.isEmpty() || username.length() < 4 || username.length() > 20) {
-                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名长度必须为4-20字符");
-            }
             if (!username.matches("^[a-zA-Z0-9]+$")) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名只能包含字母和数字");
             }
@@ -970,6 +967,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名已被占用");
             }
             admin.setUserName(username);
+        }
+
+        // 4.5 密码修改逻辑
+        if (adminUpdateDTO.getOldPassWord() != null || adminUpdateDTO.getNewPassWord() != null) {
+            // 新旧密码必须同时提供
+            if (adminUpdateDTO.getOldPassWord() == null || adminUpdateDTO.getNewPassWord() == null) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "修改密码时必须同时提供旧密码和新密码");
+            }
+
+            String oldPassword = adminUpdateDTO.getOldPassWord().trim();
+            String newPassword = adminUpdateDTO.getNewPassWord().trim();
+
+            // 密码不能为空
+            if (oldPassword.isEmpty() || newPassword.isEmpty()) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码不能为空");
+            }
+            String oldPassWord = DigestUtils.md5DigestAsHex(oldPassword.getBytes(StandardCharsets.UTF_8));
+            String newPassWord = DigestUtils.md5DigestAsHex(newPassword.getBytes(StandardCharsets.UTF_8));
+            User user = userMapper.selectById(adminId);
+            if(!user.getPassword().equals(oldPassWord)){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "原密码错误");
+            }
+            admin.setPassword(newPassWord);
         }
 
         // 5. 执行更新
