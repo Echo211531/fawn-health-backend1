@@ -186,6 +186,21 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
             List<DietFoodItemDTO> foodDTOs = foodItems.stream().map(item -> {
                 DietFoodItemDTO dto = new DietFoodItemDTO();
                 BeanUtils.copyProperties(item, dto);
+
+                // 查询食物库获取名称和图片（与getHistoryRecords保持一致）
+                if (item.getFoodId() != null) {
+                    FoodLibrary food = foodLibraryMapper.selectById(item.getFoodId());
+                    if (food != null) {
+                        dto.setFoodName(food.getName());
+                        dto.setFoodImage(food.getImage());
+                        dto.setCategoryName(food.getCategoryName());
+                    }
+                } else {
+                    dto.setFoodName(item.getFoodName());
+                    dto.setFoodImage(null);
+                    dto.setCategoryName(null);
+                }
+
                 return dto;
             }).collect(Collectors.toList());
             vo.setFoodItems(foodDTOs);
