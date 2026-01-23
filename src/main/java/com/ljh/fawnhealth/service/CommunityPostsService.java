@@ -117,4 +117,11 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
      * @return 是否删除成功
      */
     boolean deletePost(Long postId, Long userId);
+
+    /**
+     * 根据关键词搜索帖子（按标题或内容）
+     * @param keyword 搜索关键词
+     * @return 匹配的帖子列表
+     */
+    List<CommunityPostsVO> searchPosts(String keyword);
 }

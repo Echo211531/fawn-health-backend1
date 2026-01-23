@@ -396,6 +396,64 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     }
 
     /**
+     * 根据关键词搜索帖子（按标题或内容）
+     * @param keyword 搜索关键词
+     * @return 匹配的帖子列表
+     */
+    @Override
+    public List<CommunityPostsVO> searchPosts(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 构建查询条件：标题或内容包含关键词，且为公开、未删除的帖子
+        LambdaQueryWrapper<CommunityPosts> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.and(wrapper -> wrapper
+                .like(CommunityPosts::getTitle, keyword)
+                .or()
+                .like(CommunityPosts::getContent, keyword))
+                .eq(CommunityPosts::getIsPublic, 1)
+                .eq(CommunityPosts::getIsDelete, 0)
+                .orderByDesc(CommunityPosts::getIsTop)
+                .orderByDesc(CommunityPosts::getCreateTime);
+
+        List<CommunityPosts> posts = communityPostsMapper.selectList(queryWrapper);
+
+        if (posts.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 转换为视图对象
+        Set<Long> userIds = posts.stream()
+                .map(CommunityPosts::getUserId)
+                .collect(Collectors.toSet());
+
+        final Map<Long, User> userMap = userIds.isEmpty()
+                ? Collections.emptyMap()
+                : userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        List<CommunityPostsVO> voList = posts.stream().map(post -> {
+            CommunityPostsVO vo = new CommunityPostsVO();
+            BeanUtils.copyProperties(post, vo);
+
+            User user = userMap.get(post.getUserId());
+            if (user != null) {
+                vo.setNickname(user.getNickname());
+                vo.setAvatar(user.getAvatar());
+            }
+
+            // 设置类型描述（使用枚举的 of 方法根据数值获取类型）
+            CommunityPostsType type = CommunityPostsType.of(post.getPostType());
+            vo.setPostTypeDesc(type != null ? type.getDesc() : "未知");
+
+            return vo;
+        }).collect(Collectors.toList());
+
+        return voList;
+    }
+
+    /**
      * 执行点赞操作
      */
     private void addLike(Long postId, Long userId) {
