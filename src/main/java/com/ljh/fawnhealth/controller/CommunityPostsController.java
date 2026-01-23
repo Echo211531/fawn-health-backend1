@@ -111,6 +111,28 @@ public class CommunityPostsController {
     }
 
     /**
+     * 检查用户是否点赞过某帖子
+     *
+     * @param postId 帖子ID
+     * @param userId 用户ID
+     * @return 是否已点赞（true=已点赞，false=未点赞）
+     */
+    @GetMapping("/hashCommunityPosts")
+    public BaseResponse<Boolean> hashCommunityPosts(
+            @RequestParam Long postId,
+            @RequestParam Long userId
+    ) {
+        // 校验参数
+        ThrowUtils.throwIf(postId == null, ErrorCode.PARAMS_ERROR, "帖子ID不能为空");
+        ThrowUtils.throwIf(userId == null, ErrorCode.USER_NOTFOUND);
+
+        // 调用服务层方法检查点赞状态
+        Boolean hasLiked = communityPostsService.hashCommunityPosts(postId, userId);
+
+        return ResultUtils.success(hasLiked != null && hasLiked);
+    }
+
+    /**
      * 发布新帖子接口
      *
      * @param communityPosts 帖子实体对象，包含帖子内容、标题等信息

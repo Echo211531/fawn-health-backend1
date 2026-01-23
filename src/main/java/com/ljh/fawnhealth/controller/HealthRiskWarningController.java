@@ -45,6 +45,15 @@ public class HealthRiskWarningController {
     }
 
     /**
+     * 查询指定用户未处理预警数量
+     */
+    @GetMapping("/unprocessed/count")
+    public BaseResponse<Long> countUnprocessedByUser(@RequestParam Long userId) {
+        long count = service.countUnprocessedByUser(userId);
+        return ResultUtils.success(count);
+    }
+
+    /**
      * 建立SSE连接，实时获取用户最新预警记录
      * 
      * @param userId 用户ID

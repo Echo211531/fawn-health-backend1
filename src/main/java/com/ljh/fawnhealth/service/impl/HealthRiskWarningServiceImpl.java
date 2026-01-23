@@ -62,4 +62,13 @@ public class HealthRiskWarningServiceImpl implements HealthRiskWarningService {
                 .last("LIMIT " + limit);
         return mapper.selectList(wrapper);
     }
+
+    @Override
+    public long countUnprocessedByUser(Long userId) {
+        LambdaQueryWrapper<HealthRiskWarning> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthRiskWarning::getUserId, userId)
+                .eq(HealthRiskWarning::getStatus, 0);
+        // 使用 MyBatis-Plus 提供的 count 方法
+        return mapper.selectCount(wrapper);
+    }
 }

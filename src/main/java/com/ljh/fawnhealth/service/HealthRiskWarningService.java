@@ -26,4 +26,9 @@ public interface HealthRiskWarningService {
      * 获取用户最近的未处理预警记录（按触发时间倒序，限制条数）
      */
     List<HealthRiskWarning> getLatestUnprocessedByUser(Long userId, int limit);
+
+    /**
+     * 统计用户未处理预警数量
+     */
+    long countUnprocessedByUser(Long userId);
 }
