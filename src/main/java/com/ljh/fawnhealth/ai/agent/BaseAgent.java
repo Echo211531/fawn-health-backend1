@@ -108,6 +108,17 @@ public abstract class BaseAgent {
             this.state = AgentState.RUNNING;
             // 记录用户消息
             messageList.add(new UserMessage(userPrompt));
+            // 保存用户消息到流式事件存储，确保上下文记录一致
+            if (chatStreamEventStore != null && StrUtil.isNotBlank(chatId)) {
+                try {
+                    String userId = getCurrentUserId();
+                    StreamEvent userMessageEvent = new StreamEvent(StreamEventType.USER_MESSAGE, userPrompt);
+                    chatStreamEventStore.saveStreamEvent(chatId, userMessageEvent, userId);
+                    log.debug("保存用户消息到流式事件存储: chatId={}, message={}", chatId, userPrompt);
+                } catch (Exception e) {
+                    log.error("保存用户消息到流式事件存储失败: chatId={}", chatId, e);
+                }
+            }
 
             try {
                 // 循环执行最多 maxSteps 步

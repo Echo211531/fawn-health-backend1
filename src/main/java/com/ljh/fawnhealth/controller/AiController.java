@@ -11,6 +11,7 @@ import com.ljh.fawnhealth.ai.model.StreamEvent;
 import com.ljh.fawnhealth.ai.model.StreamEventType;
 import com.ljh.fawnhealth.ai.store.ChatStreamEventStore;
 import com.ljh.fawnhealth.ai.store.MongoChatMemory;
+import com.ljh.fawnhealth.ai.util.ChatStreamHelper;
 import com.ljh.fawnhealth.ai.tool.collection.ToolCollection;
 import com.ljh.fawnhealth.commen.BaseResponse;
 import com.ljh.fawnhealth.config.ResultUtils;
@@ -46,13 +47,15 @@ public class AiController {
     // 流式调用
     @GetMapping(value = "chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> doChat(String message, String chatId) {
-        return healthApp.doChat(message, chatId);
+        chatStreamHelper.saveUserMessage(message, chatId);
+        return chatStreamHelper.enhanceFluxWithSave(healthApp.doChat(message, chatId), chatId);
     }
 
     // 流式调用：设置泛型为 ServerSentEvent，使用这种方式可以省略 MediaType
     @GetMapping(value = "/chat/sse")
     public Flux<ServerSentEvent<String>> doChatWithSSE(String message, String chatId) {
-        return healthApp.doChat(message, chatId)
+        chatStreamHelper.saveUserMessage(message, chatId);
+        return chatStreamHelper.enhanceFluxWithSave(healthApp.doChat(message, chatId), chatId)
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .data(chunk)
                         .build());
@@ -62,18 +65,9 @@ public class AiController {
     // 通过 send 方法持续向 SseEmitter 发送消息(有点像 IO 操作)
     @GetMapping(value = "/chat/sse_emitter")
     public SseEmitter doChatWithSseEmitter(String message, String chatId) {
-        // 创建一个超时时间较长的 SseEmitter
+        chatStreamHelper.saveUserMessage(message, chatId);
         SseEmitter sseEmitter = new SseEmitter(180000L); // 3 分钟超时
-        // 获取 Flux 响应式数据流并且直接通过订阅推送给 SseEmitter
-        healthApp.doChat(message, chatId)
-                .subscribe(chunk -> {
-                    try {
-                        sseEmitter.send(chunk);
-                    } catch (IOException e) {
-                        sseEmitter.completeWithError(e);
-                    }
-                }, sseEmitter::completeWithError, sseEmitter::complete);
-        // 返回
+        chatStreamHelper.subscribeWithSave(healthApp.doChat(message, chatId), sseEmitter, chatId);
         return sseEmitter;
     }
 
@@ -88,13 +82,15 @@ public class AiController {
     // RAG检索增强
     @GetMapping(value = "chat/rag", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> doChatWithRag(String message, String chatId) {
-        return healthApp.doChatWithRag(message, chatId);
+        chatStreamHelper.saveUserMessage(message, chatId);
+        return chatStreamHelper.enhanceFluxWithSave(healthApp.doChatWithRag(message, chatId), chatId);
     }
 
     // Mcp 服务
     @GetMapping(value = "chat/mcp", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> doChatWithMcp(String message, String chatId) {
-        return healthApp.doChatWithMcp(message, chatId);
+        chatStreamHelper.saveUserMessage(message, chatId);
+        return chatStreamHelper.enhanceFluxWithSave(healthApp.doChatWithMcp(message, chatId), chatId);
     }
 
     @Resource
@@ -105,6 +101,8 @@ public class AiController {
     private ChatModel dashscopeChatModel;
     @Resource
     private ChatStreamEventStore chatStreamEventStore;
+    @Resource
+    private ChatStreamHelper chatStreamHelper;
 
     // 流式调用 Manus 超级智能体（改进版）
     @GetMapping("/chat/manus")
