@@ -538,6 +538,13 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
                                 .eq("id", postId)
                 );
             }
+            
+            // 删除帖子详情缓存，确保下次查询时获取最新的点赞数
+            // 需要删除 public 和 private 两种缓存（因为同一个帖子可能在不同场景下查询）
+            String publicCacheKey = postId + ":public";
+            String privateCacheKey = postId + ":private";
+            cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, publicCacheKey);
+            cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, privateCacheKey);
         });
     }
 
