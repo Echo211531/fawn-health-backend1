@@ -10,6 +10,7 @@ import com.ljh.fawnhealth.service.CommunityPostsService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -241,6 +242,25 @@ public class CommunityPostsController {
     public BaseResponse<List<CommunityPostsVO>> searchPosts(@RequestParam String keyword) {
         ThrowUtils.throwIf(keyword == null || keyword.trim().isEmpty(), ErrorCode.PARAMS_ERROR, "搜索关键词不能为空");
         List<CommunityPostsVO> posts = communityPostsService.searchPosts(keyword.trim());
+        return ResultUtils.success(posts);
+    }
+
+    /**
+     * 根据关注的用户ID列表获取帖子
+     * @param followingIds 关注的用户ID列表（逗号分隔）
+     * @return 帖子列表
+     */
+    @GetMapping("/getPostsByFollowingIds")
+    public BaseResponse<List<CommunityPostsVO>> getPostsByFollowingIds(@RequestParam String followingIds) {
+        List<Long> ids = List.of();
+        if (followingIds != null && !followingIds.trim().isEmpty()) {
+            ids = Arrays.stream(followingIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        List<CommunityPostsVO> posts = communityPostsService.getPostsByFollowingIds(ids);
         return ResultUtils.success(posts);
     }
 

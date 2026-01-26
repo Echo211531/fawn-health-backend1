@@ -124,4 +124,11 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
      * @return 匹配的帖子列表
      */
     List<CommunityPostsVO> searchPosts(String keyword);
+
+    /**
+     * 根据关注的用户ID列表获取帖子
+     * @param followingIds 关注的用户ID列表
+     * @return 帖子列表
+     */
+    List<CommunityPostsVO> getPostsByFollowingIds(List<Long> followingIds);
 }

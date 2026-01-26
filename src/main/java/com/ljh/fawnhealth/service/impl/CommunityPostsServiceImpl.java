@@ -453,6 +453,47 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         return voList;
     }
 
+    @Override
+    public List<CommunityPostsVO> getPostsByFollowingIds(List<Long> followingIds) {
+        if (followingIds == null || followingIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        QueryWrapper<CommunityPosts> queryWrapper = new QueryWrapper<>();
+        queryWrapper.in("user_id", followingIds)
+                .eq("is_public", 1)
+                .eq("is_delete", 0)
+                .orderByDesc("is_top")
+                .orderByDesc("create_time");
+
+        List<CommunityPosts> posts = communityPostsMapper.selectList(queryWrapper);
+
+        if (posts.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<Long> userIds = posts.stream()
+                .map(CommunityPosts::getUserId)
+                .collect(Collectors.toSet());
+
+        final Map<Long, User> userMap = userIds.isEmpty()
+                ? Collections.emptyMap()
+                : userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        return posts.stream()
+                .map(post -> {
+                    CommunityPostsVO vo = convertToVO(post);
+                    User user = userMap.get(post.getUserId());
+                    if (user != null) {
+                        vo.setNickname(user.getNickname());
+                        vo.setAvatar(user.getAvatar());
+                    }
+                    return vo;
+                })
+                .collect(Collectors.toList());
+    }
+
     /**
      * 执行点赞操作
      */

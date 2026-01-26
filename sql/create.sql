@@ -670,3 +670,19 @@ ALTER TABLE health_risk_warnings
 ALTER TABLE intervention_plans
     MODIFY COLUMN id BIGINT NOT NULL COMMENT '主键ID',
     ADD COLUMN is_delete TINYINT NOT NULL DEFAULT 0 COMMENT '是否删除：0-否，1-是' AFTER enabled;
+
+
+-- 用户关注表
+CREATE TABLE `user_follow` (
+                               `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'ID',
+                               `follower_id` bigint NOT NULL COMMENT '关注者ID（粉丝）',
+                               `following_id` bigint NOT NULL COMMENT '被关注者ID（博主）',
+                               `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                               `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                               `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除:0否,1是',
+                               PRIMARY KEY (`id`),
+                               UNIQUE KEY `idx_follower_following` (`follower_id`, `following_id`),
+                               KEY `idx_follower_id` (`follower_id`),
+                               KEY `idx_following_id` (`following_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户关注表';
+
