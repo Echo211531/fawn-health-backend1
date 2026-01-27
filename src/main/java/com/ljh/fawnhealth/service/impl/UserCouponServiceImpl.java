@@ -139,7 +139,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 //    }
 
     /**
-     * 领取优惠券
+     * 领取优惠券（优化版：Redis预扣减 + 数据库校验 + MQ异步同步）
      * @param couponsId
      * @param userId
      * @return
@@ -148,7 +148,6 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     public int receiveCoupon(Long couponsId, Long userId) {
         // 1.查询优惠券
         Coupons coupons = couponsMapper.selectById(couponsId);
-        System.out.println("优惠券信息："+ coupons);
         if (coupons == null) {
             throw new BusinessException(ErrorCode.COUPON_NOT_FOUND);
         }
@@ -158,58 +157,57 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         if (now.before(coupons.getIssueBeginTime()) || now.after(coupons.getIssueEndTime())) {
             throw new BusinessException(ErrorCode.COUPON_BEGIN_END);
         }
-        // 3.校验库存
-        System.out.println("优惠券领取数量："+ coupons.getIssueNum());
-        if (coupons.getIssueNum() >= coupons.getTotalNum()) {
+
+        // 3. Redis 预扣减库存（快速响应）
+        String stockKey = PromotionConstants.COUPON_CACHE_KEY_PREFIX + couponsId + ":stock";
+        Long remainStock = redisTemplate.opsForValue().decrement(stockKey);
+        
+        // 如果 Redis 中没有库存缓存，初始化库存
+        if (remainStock == null) {
+            // 从数据库获取当前剩余库存
+            int remainingStock = coupons.getTotalNum() - coupons.getIssueNum();
+            if (remainingStock <= 0) {
+                throw new BusinessException(ErrorCode.COUPON_STOCK);
+            }
+            // 初始化 Redis 库存
+            redisTemplate.opsForValue().set(stockKey, String.valueOf(remainingStock));
+            remainStock = redisTemplate.opsForValue().decrement(stockKey);
+        }
+        
+        if (remainStock < 0) {
+            // 库存不足，回滚 Redis
+            redisTemplate.opsForValue().increment(stockKey);
             throw new BusinessException(ErrorCode.COUPON_STOCK);
-       }
-
-        // 4.校验每人限领数量
-        String key = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + couponsId;
-        RLock lock = redissonClient.getLock(key);
-        boolean isLock = lock.tryLock();
-
-        if (!isLock) {
-            throw new BusinessException(ErrorCode.REQUEST_ARE_FREQUENT);
         }
 
-        try {
-            // AOP 调用代理方法
-            UserCouponService userCouponService = (UserCouponService) AopContext.currentProxy();
-            int result = userCouponService.checkAndCreateUserCoupon(coupons, userId, null);
-
-            // 4.1 增加用户领取数量（Redis中）
-            Long count = redisTemplate.opsForHash().increment(key, userId.toString(), 1);
-            if (count != null && count > coupons.getUserLimit()) {
-                throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
-            }
-
-            // 5. 扣减库存
-//            redisTemplate.opsForHash().increment(
-//                    PromotionConstants.COUPON_CACHE_KEY_PREFIX + couponsId, "totalNum", -1);
-
-            // 获取当前的 totalNum 值
-            String value = (String) redisTemplate.opsForHash().get(PromotionConstants.COUPON_CACHE_KEY_PREFIX + couponsId, "totalNum");
-            if (value != null) {
-                try {
-                    Integer totalNum = Integer.parseInt(value);
-                    // 进行操作
-                } catch (NumberFormatException e) {
-                    // 处理转换异常，日志记录或返回错误
-                }
-            }
-
-
-            // 6. 发送 MQ 消息
-            UserCouponDTO uc = new UserCouponDTO();
-            uc.setUserId(userId);
-            uc.setCouponId(couponsId);
-            messageProducer.sendCouponMessage(MqConstant.FH_ROUTING_KEY, uc);
-
-            return result;
-        } finally {
-            lock.unlock();
+        // 4. Redis 预扣减用户限领数量
+        String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + couponsId;
+        Long userCount = redisTemplate.opsForHash().increment(userKey, userId.toString(), 1);
+        
+        if (userCount != null && userCount > coupons.getUserLimit()) {
+            // 超过限领，回滚 Redis
+            redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
+            redisTemplate.opsForValue().increment(stockKey);
+            throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
         }
+
+        // 5. 数据库快速校验（防止超卖，原子操作）
+        int updateCount = couponsMapper.incrIssueNum(couponsId);
+        if (updateCount == 0) {
+            // 数据库库存不足，回滚 Redis
+            redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
+            redisTemplate.opsForValue().increment(stockKey);
+            throw new BusinessException(ErrorCode.COUPON_STOCK);
+        }
+
+        // 6. 发送 MQ 消息（异步创建用户券记录）
+        UserCouponDTO uc = new UserCouponDTO();
+        uc.setUserId(userId);
+        uc.setCouponId(couponsId);
+        messageProducer.sendCouponMessage(MqConstant.FH_ROUTING_KEY, uc);
+
+        log.info("优惠券预扣减成功: userId={}, couponId={}, remainStock={}", userId, couponsId, remainStock);
+        return 1;  // 快速返回，用户券记录由 MQ 异步创建
     }
 
 
@@ -247,33 +245,71 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         return i;
     }
 
+    /**
+     * 校验并创建用户券（带延迟双删机制，保证缓存一致性）
+     * @param coupons
+     * @param userId
+     * @param serialNum
+     * @return
+     */
     @Override
     @Transactional
     public int checkAndCreateUserCoupon(Coupons coupons, Long userId, Integer serialNum){
-        // 1.校验每人限领数量
-        // 1.1.统计当前用户对当前优惠券的已经领取的数量
-        Integer count = Math.toIntExact(lambdaQuery()
-                .eq(UserCoupon::getUserId, userId)
-                .eq(UserCoupon::getCouponId, coupons.getId())
-                .count());
-        // 1.2.校验限领数量
-        if(count != null && count >= coupons.getUserLimit()){
-            throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
+        String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + coupons.getId();
+        
+        try {
+            // 1. 延迟双删：第一次删除 Redis（确保读请求完成）
+            redisTemplate.delete(userKey);
+            
+            // 2. 校验每人限领数量（数据库最终校验）
+            Integer count = Math.toIntExact(lambdaQuery()
+                    .eq(UserCoupon::getUserId, userId)
+                    .eq(UserCoupon::getCouponId, coupons.getId())
+                    .count());
+            
+            // 3. 校验限领数量
+            if(count != null && count >= coupons.getUserLimit()){
+                throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
+            }
+            
+            // 4. 新增用户券（数据库唯一索引保证幂等性）
+            int i = saveUserCoupon(coupons, userId);
+            
+            // 5. 更新兑换码状态
+            if (serialNum != null) {
+                exchangeCodeService.lambdaUpdate()
+                        .set(ExchangeCode::getUserId, userId)
+                        .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
+                        .eq(ExchangeCode::getId, serialNum)
+                        .update();
+            }
+            
+            // 6. 延迟删除 Redis（第二次，确保数据库事务提交后的读请求也能获取最新数据）
+            // 使用异步任务延迟删除，避免阻塞
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500);  // 延迟500ms
+                    redisTemplate.delete(userKey);
+                    log.debug("延迟双删完成: userId={}, couponId={}", userId, coupons.getId());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.error("延迟双删线程被中断", e);
+                }
+            }).start();
+            
+            // 7. 更新 Redis（写入最新数据）
+            redisTemplate.opsForHash().increment(userKey, userId.toString(), 1);
+            
+            return i;
+        } catch (Exception e) {
+            // 异常时回滚 Redis
+            try {
+                redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
+            } catch (Exception ex) {
+                log.error("回滚 Redis 失败", ex);
+            }
+            throw e;
         }
-        // 2.更新优惠券的已经发放的数量 + 1
-        couponsMapper.incrIssueNum(coupons.getId());
-        // 3.新增一个用户券
-        int i = saveUserCoupon(coupons, userId);
-        // 4.更新兑换码状态
-        if (serialNum != null) {
-            exchangeCodeService.lambdaUpdate()
-                    .set(ExchangeCode::getUserId, userId)
-                    .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
-                    .eq(ExchangeCode::getId, serialNum)
-                    .update();
-        }
-        return i;
-
     }
 
     /**

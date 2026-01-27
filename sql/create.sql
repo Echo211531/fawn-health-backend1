@@ -686,3 +686,12 @@ CREATE TABLE `user_follow` (
                                KEY `idx_following_id` (`following_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户关注表';
 
+
+
+-- 为 user_coupon 表添加唯一索引，保证消息幂等性
+-- 如果索引已存在，会报错，需要先删除旧索引
+
+
+-- 添加唯一索引，保证同一用户对同一优惠券只能有一条记录
+ALTER TABLE `user_coupon`
+    ADD UNIQUE INDEX `uk_user_coupon` (`user_id`, `coupon_id`);

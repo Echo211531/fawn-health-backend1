@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +31,8 @@ public class PromotionMqHandler {
     private CommentLikesMapper commentLikesMapper;
 
     /**
-     * 优惠券消息消费者
+     * 优惠券消息消费者（带幂等性保障）
+     * 通过数据库唯一索引保证消息幂等性，即使消息重复消费也不会重复创建用户券
      *
      * @param couponDTO
      * @param channel
@@ -40,17 +42,35 @@ public class PromotionMqHandler {
     public void handleCouponMessage(UserCouponDTO couponDTO, Channel channel,
                                     @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
         try {
-            log.info("收到优惠券消息: {}", couponDTO);
+            log.info("收到优惠券消息: userId={}, couponId={}", couponDTO.getUserId(), couponDTO.getCouponId());
 
-            // 业务逻辑处理
+            // 1. 查询优惠券信息
             Coupons coupon = couponsMapper.selectById(couponDTO.getCouponId());
+            if (coupon == null) {
+                log.error("优惠券不存在: couponId={}", couponDTO.getCouponId());
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
+
+            // 2. 业务逻辑处理（数据库唯一索引保证幂等性）
             userCouponService.checkAndCreateUserCoupon(coupon, couponDTO.getUserId(), null);
 
-            // 手动确认消息
+            // 3. 手动确认消息
             channel.basicAck(deliveryTag, false);
-            log.info("优惠券消息处理成功");
+            log.info("优惠券消息处理成功: userId={}, couponId={}", couponDTO.getUserId(), couponDTO.getCouponId());
+            
+        } catch (DuplicateKeyException e) {
+            // 幂等性处理：用户券已存在，直接确认消息（不重复处理）
+            log.info("用户券已存在，跳过处理（幂等）: userId={}, couponId={}", 
+                     couponDTO.getUserId(), couponDTO.getCouponId());
+            try {
+                channel.basicAck(deliveryTag, false);
+            } catch (IOException ex) {
+                log.error("确认消息失败", ex);
+            }
         } catch (Exception e) {
-            log.error("处理优惠券消息失败: {}", e.getMessage(), e);
+            log.error("处理优惠券消息失败: userId={}, couponId={}, error={}", 
+                     couponDTO.getUserId(), couponDTO.getCouponId(), e.getMessage(), e);
             try {
                 // 拒绝消息并发送到死信队列
                 channel.basicNack(deliveryTag, false, false);
