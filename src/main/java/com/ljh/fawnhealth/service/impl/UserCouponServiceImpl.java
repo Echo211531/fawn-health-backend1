@@ -38,6 +38,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import cn.hutool.core.bean.BeanUtil;
@@ -45,6 +46,7 @@ import cn.hutool.core.bean.copier.CopyOptions;
 
 
 import java.util.*;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
@@ -56,6 +58,56 @@ import java.util.stream.Collectors;
 @Service
 public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCoupon>
     implements UserCouponService {
+
+    /**
+     * Redis Lua 脚本：原子预扣减优惠券库存 + 校验并更新用户限领次数
+     *
+     * KEYS[1] = 库存 key，例如 prs:coupon:{couponId}:stock
+     * KEYS[2] = 用户限领 hash key，例如 prs:user:coupon:{couponId}
+     * ARGV[1] = userId
+     * ARGV[2] = userLimit
+     *
+     * 返回值：
+     *  1  成功预扣减
+     *  0  库存不足
+     * -1 超出用户限领
+     */
+    private static final String COUPON_PRE_DECR_LUA =
+            "local stock = redis.call('get', KEYS[1])\n" +
+            "if not stock then\n" +
+            "    return 0\n" +
+            "end\n" +
+            "local stockNum = tonumber(stock)\n" +
+            "if not stockNum or stockNum <= 0 then\n" +
+            "    return 0\n" +
+            "end\n" +
+            "stockNum = stockNum - 1\n" +
+            "if stockNum < 0 then\n" +
+            "    return 0\n" +
+            "end\n" +
+            "redis.call('set', KEYS[1], tostring(stockNum))\n" +
+            "\n" +
+            "local userId = ARGV[1]\n" +
+            "local userLimit = tonumber(ARGV[2])\n" +
+            "\n" +
+            "local userCount = redis.call('hget', KEYS[2], userId)\n" +
+            "if not userCount then\n" +
+            "    userCount = 0\n" +
+            "else\n" +
+            "    userCount = tonumber(userCount)\n" +
+            "    if not userCount then\n" +
+            "        userCount = 0\n" +
+            "    end\n" +
+            "end\n" +
+            "\n" +
+            "userCount = userCount + 1\n" +
+            "if userCount > userLimit then\n" +
+            "    redis.call('set', KEYS[1], tostring(stockNum + 1))\n" +
+            "    return -1\n" +
+            "end\n" +
+            "\n" +
+            "redis.call('hset', KEYS[2], userId, tostring(userCount))\n" +
+            "return 1\n";
 
     @Resource
     private UserCouponMapper userCouponMapper;
@@ -139,75 +191,69 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 //    }
 
     /**
-     * 领取优惠券（优化版：Redis预扣减 + 数据库校验 + MQ异步同步）
-     * @param couponsId
-     * @param userId
-     * @return
+     * 领取优惠券（Lua + Redis 原子预扣减 + MQ 最终一致性）
+     *
+     * @param couponsId 优惠券ID
+     * @param userId    用户ID
+     * @return 1 表示预扣成功
      */
     @Override
     public int receiveCoupon(Long couponsId, Long userId) {
-        // 1.查询优惠券
+        // 1. 查询优惠券
         Coupons coupons = couponsMapper.selectById(couponsId);
         if (coupons == null) {
             throw new BusinessException(ErrorCode.COUPON_NOT_FOUND);
         }
 
-        // 2.校验发放时间
+        // 2. 校验发放时间
         Date now = new Date();
         if (now.before(coupons.getIssueBeginTime()) || now.after(coupons.getIssueEndTime())) {
             throw new BusinessException(ErrorCode.COUPON_BEGIN_END);
         }
 
-        // 3. Redis 预扣减库存（快速响应）
+        // 3. 准备 Redis key
         String stockKey = PromotionConstants.COUPON_CACHE_KEY_PREFIX + couponsId + ":stock";
-        Long remainStock = redisTemplate.opsForValue().decrement(stockKey);
-        
-        // 如果 Redis 中没有库存缓存，初始化库存
-        if (remainStock == null) {
-            // 从数据库获取当前剩余库存
+        String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + couponsId;
+
+        // 3.1 冷启动时惰性初始化库存到 Redis（非强一致，但只影响首次）
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(stockKey))) {
             int remainingStock = coupons.getTotalNum() - coupons.getIssueNum();
             if (remainingStock <= 0) {
                 throw new BusinessException(ErrorCode.COUPON_STOCK);
             }
-            // 初始化 Redis 库存
             redisTemplate.opsForValue().set(stockKey, String.valueOf(remainingStock));
-            remainStock = redisTemplate.opsForValue().decrement(stockKey);
-        }
-        
-        if (remainStock < 0) {
-            // 库存不足，回滚 Redis
-            redisTemplate.opsForValue().increment(stockKey);
-            throw new BusinessException(ErrorCode.COUPON_STOCK);
         }
 
-        // 4. Redis 预扣减用户限领数量
-        String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + couponsId;
-        Long userCount = redisTemplate.opsForHash().increment(userKey, userId.toString(), 1);
-        
-        if (userCount != null && userCount > coupons.getUserLimit()) {
-            // 超过限领，回滚 Redis
-            redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
-            redisTemplate.opsForValue().increment(stockKey);
+        // 4. 执行 Lua：原子预扣减库存 + 用户限领计数
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(COUPON_PRE_DECR_LUA);
+        script.setResultType(Long.class);
+
+        Long result = redisTemplate.execute(
+                script,
+                Arrays.asList(stockKey, userKey),
+                userId.toString(),
+                String.valueOf(coupons.getUserLimit())
+        );
+
+        if (result == null || result == 0L) {
+            // 库存不足
+            throw new BusinessException(ErrorCode.COUPON_STOCK);
+        }
+        if (result == -1L) {
+            // 超出限领
             throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
         }
 
-        // 5. 数据库快速校验（防止超卖，原子操作）
-        int updateCount = couponsMapper.incrIssueNum(couponsId);
-        if (updateCount == 0) {
-            // 数据库库存不足，回滚 Redis
-            redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
-            redisTemplate.opsForValue().increment(stockKey);
-            throw new BusinessException(ErrorCode.COUPON_STOCK);
-        }
-
-        // 6. 发送 MQ 消息（异步创建用户券记录）
+        // 5. 发送 MQ 消息（异步更新数据库库存 + 创建用户券记录）
         UserCouponDTO uc = new UserCouponDTO();
         uc.setUserId(userId);
         uc.setCouponId(couponsId);
         messageProducer.sendCouponMessage(MqConstant.FH_ROUTING_KEY, uc);
 
-        log.info("优惠券预扣减成功: userId={}, couponId={}, remainStock={}", userId, couponsId, remainStock);
-        return 1;  // 快速返回，用户券记录由 MQ 异步创建
+        log.info("优惠券 Lua 预扣减成功: userId={}, couponId={}", userId, couponsId);
+        // 用户券记录由 MQ 异步创建，这里快速返回
+        return 1;
     }
 
 
