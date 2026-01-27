@@ -142,7 +142,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
             orderItem.setSpecs(itemDTO.getSpecs());
             orderItems.add(orderItem);
 
+            // 扣减库存 & 累加销量，确保商品详情页“已售”能实时反映销量
             product.setStock(product.getStock() - itemDTO.getQuantity());
+            Integer currentSales = product.getSales() == null ? 0 : product.getSales();
+            product.setSales(currentSales + itemDTO.getQuantity());
             productMapper.updateById(product);
         }
 
