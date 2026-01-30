@@ -221,9 +221,14 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             if (remainingStock <= 0) {
                 throw new BusinessException(ErrorCode.COUPON_STOCK);
             }
-            redisTemplate.opsForValue().set(stockKey, String.valueOf(remainingStock));
+            // 强制转换为纯数字字符串，避免格式问题
+            redisTemplate.opsForValue().set(stockKey, String.valueOf(remainingStock).trim());
+            log.info("初始化优惠券库存 - stockKey: {}, 库存值: {}", stockKey, remainingStock);
         }
-
+        // 3. 执行脚本前，先读取Redis中的库存值（确认代码能读到正确值）
+        String redisStock = redisTemplate.opsForValue().get(stockKey);
+        log.info("【领券】代码读取的库存值 - stockKey: {}, value: {}, 类型: {}",
+                stockKey, redisStock, (redisStock == null ? "null" : redisStock.getClass().getName()));
         // 4. 执行 Lua：原子预扣减库存 + 用户限领计数
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setScriptText(COUPON_PRE_DECR_LUA);
