@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.InterventionPlanMapper">
+<mapper namespace="com.zr.health.mapper.InterventionPlanMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.enums.rule.InterventionPlan">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.enums.rule.InterventionPlan">
         <id column="id" property="id" />
         <result column="risk_type" property="riskType" />
         <result column="title" property="title" />

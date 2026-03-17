@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.CouponUsageLogsMapper">
+<mapper namespace="com.zr.health.mapper.CouponUsageLogsMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.CouponUsageLogs">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.CouponUsageLogs">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="userId" column="user_id" jdbcType="BIGINT"/>
             <result property="couponId" column="coupon_id" jdbcType="BIGINT"/>

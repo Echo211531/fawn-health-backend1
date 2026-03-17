@@ -2,16 +2,16 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.DietFoodItemsMapper">
+<mapper namespace="com.zr.health.mapper.DietFoodItemsMapper">
 
-    <select id="selectByRecordId" resultType="com.ljh.fawnhealth.model.entity.DietFoodItems" parameterType="long">
+    <select id="selectByRecordId" resultType="com.zr.health.model.entity.DietFoodItems" parameterType="long">
         SELECT *
         FROM diet_food_items
         WHERE record_id = #{recordId}
           AND is_delete = 0
     </select>
 
-    <select id="selectByRecordIds" resultType="com.ljh.fawnhealth.model.entity.DietFoodItems">
+    <select id="selectByRecordIds" resultType="com.zr.health.model.entity.DietFoodItems">
         SELECT * FROM diet_food_items
         WHERE diet_record_id IN
         <foreach collection="recordIds" item="id" open="(" separator="," close=")">
@@ -37,7 +37,7 @@
     </insert>
 
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.DietFoodItems">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.DietFoodItems">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="recordId" column="record_id" jdbcType="BIGINT"/>
             <result property="foodId" column="food_id" jdbcType="BIGINT"/>

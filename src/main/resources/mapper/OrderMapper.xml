@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.OrderMapper">
+<mapper namespace="com.zr.health.mapper.OrderMapper">
 
     <select id="countByProductId" resultType="java.lang.Integer">
         SELECT COUNT(*)
@@ -25,7 +25,7 @@
     </select>
 
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Order">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.Order">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <id property="addressId" column="address_id" jdbcType="BIGINT"/>
             <result property="orderNo" column="order_no" jdbcType="VARCHAR"/>

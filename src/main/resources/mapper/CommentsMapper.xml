@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.CommentsMapper">
+<mapper namespace="com.zr.health.mapper.CommentsMapper">
 
     <!-- 点赞数 +1 -->
     <update id="increaseLikeCount">
@@ -18,7 +18,7 @@
         WHERE id = #{commentId}
     </update>
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Comments">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.Comments">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="postId" column="post_id" jdbcType="BIGINT"/>
             <result property="userId" column="user_id" jdbcType="BIGINT"/>

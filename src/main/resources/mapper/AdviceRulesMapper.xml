@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.AdviceRulesMapper">
+<mapper namespace="com.zr.health.mapper.AdviceRulesMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.AdviceRules">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.AdviceRules">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="conditionExpr" column="condition_expr" jdbcType="VARCHAR"/>
             <result property="adviceType" column="advice_type" jdbcType="TINYINT"/>

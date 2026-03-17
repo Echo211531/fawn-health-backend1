@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.RefundApplicationMapper">
+<mapper namespace="com.zr.health.mapper.RefundApplicationMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.RefundApplication">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.RefundApplication">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="orderId" column="order_id" jdbcType="BIGINT"/>
             <result property="orderNo" column="order_no" jdbcType="VARCHAR"/>

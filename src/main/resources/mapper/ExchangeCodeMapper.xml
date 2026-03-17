@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.ExchangeCodeMapper">
+<mapper namespace="com.zr.health.mapper.ExchangeCodeMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.ExchangeCode">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.ExchangeCode">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="code" column="code" jdbcType="VARCHAR"/>
             <result property="status" column="status" jdbcType="TINYINT"/>

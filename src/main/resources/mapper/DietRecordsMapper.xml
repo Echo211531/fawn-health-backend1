@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.DietRecordsMapper">
+<mapper namespace="com.zr.health.mapper.DietRecordsMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.DietRecords">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.DietRecords">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="userId" column="user_id" jdbcType="BIGINT"/>
             <result property="mealType" column="meal_type" jdbcType="TINYINT"/>
@@ -17,7 +17,7 @@
             <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
     </resultMap>
 
-    <select id="selectByUserIdAndDate" resultType="com.ljh.fawnhealth.model.entity.DietRecords">
+    <select id="selectByUserIdAndDate" resultType="com.zr.health.model.entity.DietRecords">
         SELECT * FROM diet_records
         WHERE user_id = #{userId}
           AND record_date = #{recordDate}

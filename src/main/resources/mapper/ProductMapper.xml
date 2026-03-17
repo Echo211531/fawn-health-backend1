@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.ProductMapper">
+<mapper namespace="com.zr.health.mapper.ProductMapper">
 
     <select id="selectByProductName" resultType="java.lang.Boolean">
         SELECT CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END
@@ -10,11 +10,11 @@
         WHERE name = #{name}
           AND is_delete = 0
     </select>
-    <select id="selectByIdAndNotDelete" resultType="com.ljh.fawnhealth.model.entity.Product">
+    <select id="selectByIdAndNotDelete" resultType="com.zr.health.model.entity.Product">
         SELECT * FROM product WHERE id = #{id} AND is_delete = 0
     </select>
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Product">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.Product">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="name" column="name" jdbcType="VARCHAR"/>
             <result property="categoryId" column="category_id" jdbcType="BIGINT"/>

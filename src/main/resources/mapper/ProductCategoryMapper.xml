@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.ProductCategoryMapper">
+<mapper namespace="com.zr.health.mapper.ProductCategoryMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.ProductCategory">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.ProductCategory">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="parentId" column="parent_id" jdbcType="BIGINT"/>
             <result property="name" column="name" jdbcType="VARCHAR"/>

@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.UserWeightHistoryMapper">
+<mapper namespace="com.zr.health.mapper.UserWeightHistoryMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.UserWeightHistory">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.UserWeightHistory">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="userId" column="user_id" jdbcType="BIGINT"/>
             <result property="weight" column="weight" jdbcType="DECIMAL"/>
@@ -16,7 +16,7 @@
         id,user_id,weight,
         record_date,create_time
     </sql>
-    <select id="selectByUserIdAndDateRange" resultType="com.ljh.fawnhealth.model.entity.UserWeightHistory">
+    <select id="selectByUserIdAndDateRange" resultType="com.zr.health.model.entity.UserWeightHistory">
         SELECT id, user_id, weight, record_date, create_time
         FROM user_weight_history
         WHERE user_id = #{userId}

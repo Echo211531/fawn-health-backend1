@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.CartMapper">
+<mapper namespace="com.zr.health.mapper.CartMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.Cart">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.Cart">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="userId" column="user_id" jdbcType="BIGINT"/>
             <result property="productId" column="product_id" jdbcType="BIGINT"/>
@@ -22,7 +22,7 @@
         create_time,update_time,is_delete
     </sql>
     <!-- 根据用户ID和商品ID查询购物车记录 -->
-    <select id="selectByUserIdAndProductId" resultType="com.ljh.fawnhealth.model.entity.Cart">
+    <select id="selectByUserIdAndProductId" resultType="com.zr.health.model.entity.Cart">
         SELECT id, user_id, product_id, quantity, selected,
                specs, create_time, update_time, is_delete
         FROM cart

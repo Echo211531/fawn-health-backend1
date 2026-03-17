@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ljh.fawnhealth.mapper.UserMapper">
+<mapper namespace="com.zr.health.mapper.UserMapper">
 
-    <resultMap id="BaseResultMap" type="com.ljh.fawnhealth.model.entity.User">
+    <resultMap id="BaseResultMap" type="com.zr.health.model.entity.User">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="userName" column="user_name" jdbcType="VARCHAR"/>
             <result property="email" column="email" jdbcType="VARCHAR"/>
