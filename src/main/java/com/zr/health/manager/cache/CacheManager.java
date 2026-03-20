@@ -27,8 +27,8 @@ public class CacheManager {
     private TopK hotKeyDetector;      // 热点键检测器，基于HeavyKeeper算法
     private Cache<String, Object> localCache;  // 本地缓存，使用Caffeine实现
 
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate;  // Redis操作模板
+    @Resource(name = "objectRedisTemplate")
+    private RedisTemplate<String, Object> redisTemplate;  // Redis操作模板（JSON序列化）
 
     /**
      * 初始化热点键检测器

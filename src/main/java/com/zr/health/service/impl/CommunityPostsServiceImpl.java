@@ -53,8 +53,8 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     @Resource
     private PostLikesMapper postLikesMapper; // 点赞记录数据库操作接口
 
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate; // Redis缓存模板
+    @Resource(name = "objectRedisTemplate")
+    private RedisTemplate<String, Object> redisTemplate; // Redis缓存模板（JSON序列化）
 
     @Resource
     @Qualifier("redisExecutor")

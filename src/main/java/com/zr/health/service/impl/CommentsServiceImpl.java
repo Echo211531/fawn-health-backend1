@@ -49,7 +49,7 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
     @Resource
     private CommunityPostsMapper communityPostsMapper;
 
-    @Resource
+    @Resource(name = "objectRedisTemplate")
     private RedisTemplate<String, Object> redisTemplate;
 
     @Resource
