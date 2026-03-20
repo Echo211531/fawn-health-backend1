@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableAspectJAutoProxy(exposeProxy = true)
-@MapperScan("com.ljh.fawnhealth.mapper")
+@MapperScan({"com.zr.health.mapper"})
 public class FawnHealthBackendApplication {
 
     public static void main(String[] args) {

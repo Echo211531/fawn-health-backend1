@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@MapperScan("com.ljh.fawnhealth.mapper")
+@MapperScan({"com.zr.health.mapper"})
 public class MybatisPlusConfig {
 
     /**
