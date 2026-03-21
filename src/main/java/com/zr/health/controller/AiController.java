@@ -87,13 +87,6 @@ public class AiController {
         return chatStreamHelper.enhanceFluxWithSave(healthApp.doChatWithRag(message, chatId), chatId);
     }
 
-    // Mcp 服务
-    @GetMapping(value = "chat/mcp", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> doChatWithMcp(String message, String chatId) {
-        chatStreamHelper.saveUserMessage(message, chatId);
-        return chatStreamHelper.enhanceFluxWithSave(healthApp.doChatWithMcp(message, chatId), chatId);
-    }
-
     @Resource
     private MongoChatMemory mongoChatMemory;
     @Resource
