@@ -1,6 +1,8 @@
 package com.zr.health.model.vo.communityPosts;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.zr.health.model.enums.communityPosts.CommunityPostsType;
 import lombok.Data;
 
@@ -12,11 +14,13 @@ public class CommunityPostsVO {
     /**
      * 帖子ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /**
      * 用户ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
 
     /**

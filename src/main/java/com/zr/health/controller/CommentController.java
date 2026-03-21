@@ -67,7 +67,9 @@ public class CommentController {
      * @param userId 当前用户ID
      */
     @PostMapping("/likeComment")
-    public BaseResponse<String> likeComment(Long commentId, Long userId) {
+    public BaseResponse<String> likeComment(
+            @RequestParam("commentId") Long commentId,
+            @RequestParam("userId") Long userId) {
         boolean liked = commentsService.toggleLike(commentId, userId);
         return liked ? ResultUtils.success("点赞成功") : ResultUtils.success("取消点赞成功");
     }

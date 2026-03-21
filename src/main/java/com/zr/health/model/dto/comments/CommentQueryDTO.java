@@ -31,4 +31,9 @@ public class CommentQueryDTO implements Serializable {
      * 当前登录用户ID（用于判断点赞状态）
      */
     private Long currentUserId;
+
+    /**
+     * 一级评论排序：like-按热度（点赞数降序，同赞按时间降序）；time-按时间（最新在前）
+     */
+    private String sortBy = "like";
 }

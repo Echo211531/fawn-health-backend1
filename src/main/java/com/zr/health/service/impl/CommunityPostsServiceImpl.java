@@ -84,6 +84,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         queryWrapper.eq("is_public", 1)
                 .eq("is_delete", 0)
                 .orderByDesc("is_top")
+                .orderByDesc("like_count")
                 .orderByDesc("create_time");
 
         List<CommunityPosts> posts = communityPostsMapper.selectList(queryWrapper);
@@ -464,6 +465,7 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
                 .eq("is_public", 1)
                 .eq("is_delete", 0)
                 .orderByDesc("is_top")
+                .orderByDesc("like_count")
                 .orderByDesc("create_time");
 
         List<CommunityPosts> posts = communityPostsMapper.selectList(queryWrapper);

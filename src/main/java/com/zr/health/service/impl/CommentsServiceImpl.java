@@ -33,6 +33,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Comparator.comparing;
+import static java.util.Comparator.nullsLast;
+import static java.util.Comparator.reverseOrder;
+
 /**
  * 评论服务实现类（支持多级嵌套与逻辑删除、点赞等）
  */
@@ -157,7 +161,8 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
      */
     @Override
     public List<CommentVO> listCommentsByPostId(CommentQueryDTO dto) {
-        String redisKey = "comments:post:" + dto.getPostId() + ":page:" + dto.getPageNum();
+        String sortKey = normalizeCommentSortBy(dto.getSortBy());
+        String redisKey = "comments:post:" + dto.getPostId() + ":page:" + dto.getPageNum() + ":sort:" + sortKey;
         ValueOperations<String, Object> ops = redisTemplate.opsForValue();
 
         Object cache = ops.get(redisKey);
@@ -190,8 +195,14 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         Map<Long, Comments> allCommentsMap = allComments.stream()
                 .collect(Collectors.toMap(Comments::getId, c -> c));
 
-        // 5. 分页一级评论
-        List<Comments> topComments = parentIdMap.getOrDefault(0L, new ArrayList<>());
+        // 5. 一级评论排序后分页
+        List<Comments> topComments = new ArrayList<>(parentIdMap.getOrDefault(0L, new ArrayList<>()));
+        if ("like".equals(sortKey)) {
+            topComments.sort(comparing((Comments c) -> c.getLikeCount() != null ? c.getLikeCount() : 0, reverseOrder())
+                    .thenComparing(Comments::getCreateTime, nullsLast(reverseOrder())));
+        } else {
+            topComments.sort(comparing(Comments::getCreateTime, nullsLast(reverseOrder())));
+        }
         int fromIndex = (dto.getPageNum() - 1) * dto.getPageSize();
         int toIndex = Math.min(fromIndex + dto.getPageSize(), topComments.size());
         if (fromIndex >= topComments.size()) {
@@ -438,8 +449,23 @@ public class CommentsServiceImpl extends ServiceImpl<CommentsMapper, Comments>
         return vo;
     }
 
+    /**
+     * 规范化评论排序参数：like / time
+     */
+    private static String normalizeCommentSortBy(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) {
+            return "like";
+        }
+        String s = sortBy.trim().toLowerCase();
+        if ("time".equals(s)) {
+            return "time";
+        }
+        return "like";
+    }
+
     private void clearCommentCacheByPostId(Long postId) {
-        String pattern = "comments:post:" + postId + ":page:*";
+        // 清除该帖下所有分页与排序维度的评论列表缓存
+        String pattern = "comments:post:" + postId + ":*";
         Set<String> keys = redisTemplate.keys(pattern);
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
