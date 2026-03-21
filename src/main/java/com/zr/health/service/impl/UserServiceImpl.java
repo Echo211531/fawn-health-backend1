@@ -66,16 +66,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private UserLoginLogMapper userLoginLogMapper;
 
-    // 基础代谢计算系数
-    private static final BigDecimal MALE_FACTOR = new BigDecimal("10");
-    private static final BigDecimal FEMALE_FACTOR = new BigDecimal("9.25");
-    private static final BigDecimal HEIGHT_FACTOR = new BigDecimal("6.25");
-    private static final BigDecimal AGE_FACTOR_MALE = new BigDecimal("5");
-    private static final BigDecimal AGE_FACTOR_FEMALE = new BigDecimal("4.92");
+    /**
+     * Mifflin-St Jeor 公式系数：BMR = 10×体重(kg) + 6.25×身高(cm) - 5×年龄；男性 +5，女性 -161
+     */
+    private static final BigDecimal BMR_WEIGHT_COEF = new BigDecimal("10");
+    private static final BigDecimal BMR_HEIGHT_COEF = new BigDecimal("6.25");
+    private static final BigDecimal BMR_AGE_COEF = new BigDecimal("5");
+    private static final BigDecimal BMR_MALE_OFFSET = new BigDecimal("5");
+    private static final BigDecimal BMR_FEMALE_OFFSET = new BigDecimal("161");
 
-    // 热量计算常量
+    /**
+     * 每日总消耗 TDEE = BMR × 活动系数。
+     * 原先用 1.55（中度活动，每周锻炼 3～5 次）对久坐/学生群体普遍偏高，容易把「今日预算」算得过大。
+     * 默认采用 1.375（轻度活动，久坐+偶尔走动），更符合多数用户日常；若后续有运动等级字段可再细分。
+     */
+    private static final BigDecimal DEFAULT_ACTIVITY_FACTOR = new BigDecimal("1.375");
+
+    // 热量计算常量：每增减 1kg 体脂约 7700 千卡（常用经验值）
     private static final BigDecimal CALORIES_PER_KG = new BigDecimal("7700");
-    private static final BigDecimal DEFAULT_ACTIVITY_FACTOR = new BigDecimal("1.55");
 
 
     /**
@@ -347,16 +355,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 计算年龄
         int age = calculateAge(birthday);
 
-        // 基础代谢率计算
-        BigDecimal weightFactor = gender == 1 ? MALE_FACTOR : FEMALE_FACTOR;
-        BigDecimal ageFactor = gender == 1 ? AGE_FACTOR_MALE : AGE_FACTOR_FEMALE;
-
-        BigDecimal bmr = weight.multiply(weightFactor)
-                .add(height.multiply(HEIGHT_FACTOR))
-                .subtract(new BigDecimal(age).multiply(ageFactor));
-
-        if (gender == 2) { // 女性需要减161
-            bmr = bmr.subtract(new BigDecimal("161"));
+        // Mifflin-St Jeor：男 10w+6.25h-5a+5；女 10w+6.25h-5a-161
+        BigDecimal bmr = weight.multiply(BMR_WEIGHT_COEF)
+                .add(height.multiply(BMR_HEIGHT_COEF))
+                .subtract(new BigDecimal(age).multiply(BMR_AGE_COEF));
+        if (gender == 1) {
+            bmr = bmr.add(BMR_MALE_OFFSET);
+        } else {
+            bmr = bmr.subtract(BMR_FEMALE_OFFSET);
         }
 
         return bmr.setScale(0, RoundingMode.HALF_UP);
