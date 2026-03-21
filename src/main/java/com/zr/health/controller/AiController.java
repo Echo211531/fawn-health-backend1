@@ -16,6 +16,8 @@ import com.zr.health.ai.tool.collection.ToolCollection;
 import com.zr.health.commen.BaseResponse;
 import com.zr.health.config.ResultUtils;
 import com.zr.health.context.BaseContext;
+import com.zr.health.model.dto.ai.DietPlanRequestDTO;
+import com.zr.health.service.ai.DietPlanAiService;
 import com.zr.health.exception.ErrorCode;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -149,6 +151,21 @@ public class AiController {
 
     @jakarta.annotation.Resource
     private UserInputQueue userInputQueue;
+
+    @Resource
+    private DietPlanAiService dietPlanAiService;
+
+    /**
+     * 根据目标体重、计划天数等信息，调用大模型生成单日饮食搭配建议（Markdown）。
+     *
+     * @param dto 体重目标与热量预算等参数
+     * @return AI 生成的文本内容
+     */
+    @PostMapping("/diet-plan")
+    public BaseResponse<String> generateDietPlan(@RequestBody DietPlanRequestDTO dto) {
+        String content = dietPlanAiService.generateDietPlan(dto);
+        return ResultUtils.success(content);
+    }
 
     /**
      * 询问用户后，用户输入接口后，前端进行调用该接口，把用户输入的内容传递到内容中
