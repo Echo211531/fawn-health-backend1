@@ -130,4 +130,12 @@ public interface CommunityPostsService extends IService<CommunityPosts> {
      * @return 帖子列表
      */
     List<CommunityPostsVO> getPostsByFollowingIds(List<Long> followingIds);
+
+    /**
+     * 帖子浏览量 +1，并清除详情缓存
+     *
+     * @param postId 帖子ID
+     * @return 更新后的浏览量
+     */
+    Integer incrementPostView(Long postId);
 }

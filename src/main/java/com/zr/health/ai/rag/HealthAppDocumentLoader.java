@@ -10,10 +10,16 @@ import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HexFormat;
 
 
 /**
@@ -97,4 +103,54 @@ public class HealthAppDocumentLoader {
         }
         return allDocuments;
     }
+
+    /**
+     * 对 classpath:document 下所有 .md 文件做稳定排序后计算 SHA-256 摘要，
+     * 用于判断与上次启动相比知识库源文件是否变化（避免重复向量化）。
+     *
+     * @return 摘要十六进制字符串与参与计算的 Markdown 文件数量
+     */
+    public ManifestDigest computeManifestDigest() {
+        try {
+            Resource[] resources = resourcePatternResolver.getResources("classpath:document/**/*.md");
+            List<Resource> list = new ArrayList<>(Arrays.asList(resources));
+            list.sort(Comparator.comparing(r -> {
+                try {
+                    return r.getURL() != null ? r.getURL().toExternalForm() : "";
+                } catch (IOException e) {
+                    return "";
+                }
+            }));
+
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            int markdownFileCount = 0;
+            for (Resource resource : list) {
+                String filename = resource.getFilename();
+                if (filename == null || !filename.endsWith(".md")) {
+                    continue;
+                }
+                markdownFileCount++;
+                md.update(filename.getBytes(StandardCharsets.UTF_8));
+                md.update((byte) '|');
+                try (InputStream in = resource.getInputStream()) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) >= 0) {
+                        md.update(buf, 0, n);
+                    }
+                }
+                md.update((byte) '\n');
+            }
+            String sha256Hex = HexFormat.of().formatHex(md.digest());
+            return new ManifestDigest(sha256Hex, markdownFileCount);
+        } catch (Exception e) {
+            log.error("计算知识库文档摘要失败", e);
+            return new ManifestDigest("", 0);
+        }
+    }
+
+    /**
+     * 知识库源文件清单摘要（文件名 + 内容字节）。
+     */
+    public record ManifestDigest(String sha256Hex, int markdownFileCount) {}
 }

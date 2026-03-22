@@ -763,6 +763,31 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
     }
 
     /**
+     * 帖子浏览量 +1，并清除详情缓存，保证列表与详情接口读到最新浏览量
+     *
+     * @param postId 帖子ID
+     * @return 更新后的浏览量
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Integer incrementPostView(Long postId) {
+        ThrowUtils.throwIf(postId == null, ErrorCode.PARAMS_ERROR, "帖子ID不能为空");
+        CommunityPosts post = communityPostsMapper.selectById(postId);
+        ThrowUtils.throwIf(post == null || (post.getIsDelete() != null && post.getIsDelete() == 1),
+                ErrorCode.COMMUNITY_POST_NOT_FOUND);
+        UpdateWrapper<CommunityPosts> uw = new UpdateWrapper<>();
+        uw.eq("id", postId).setSql("view_count = IFNULL(view_count, 0) + 1");
+        int rows = communityPostsMapper.update(null, uw);
+        ThrowUtils.throwIf(rows <= 0, ErrorCode.OPERATION_ERROR, "更新浏览量失败");
+        String publicCacheKey = postId + ":public";
+        String privateCacheKey = postId + ":private";
+        cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, publicCacheKey);
+        cacheManager.delete(CommunityPostsConstant.POST_DETAIL_KEY_PREFIX, privateCacheKey);
+        CommunityPosts updated = communityPostsMapper.selectById(postId);
+        return updated != null && updated.getViewCount() != null ? updated.getViewCount() : 0;
+    }
+
+    /**
      * 发布帖子并处理缓存与布隆过滤器。
      *
      * @param post 待发布的帖子实体，需包含标题、内容等基础信息
@@ -778,6 +803,9 @@ public class CommunityPostsServiceImpl extends ServiceImpl<CommunityPostsMapper,
         post.setIsDelete(0);
         post.setIsPublic(post.getIsPublic()); // 默认为公开
         post.setIsTop(post.getIsTop() != null ? post.getIsTop() : 0); // 默认为非置顶
+        if (post.getViewCount() == null) {
+            post.setViewCount(0);
+        }
 
         // 插入数据库
         int result = communityPostsMapper.insert(post);

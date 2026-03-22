@@ -84,6 +84,11 @@ public class CommunityPostsVO {
     private Integer shareCount;
 
     /**
+     * 浏览量
+     */
+    private Integer viewCount;
+
+    /**
      * 是否置顶: 0-否, 1-是
      */
     private Boolean isTop;

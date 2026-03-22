@@ -60,6 +60,19 @@ public class CommunityPostsController {
         return ResultUtils.success(postVO);
     }
 
+    /**
+     * 帖子浏览量 +1（进入详情页时调用）
+     *
+     * @param postId 帖子ID
+     * @return 更新后的浏览量
+     */
+    @PostMapping("/incrementView")
+    public BaseResponse<Integer> incrementView(@RequestParam Long postId) {
+        ThrowUtils.throwIf(postId == null, ErrorCode.PARAMS_ERROR, "帖子ID不能为空");
+        Integer count = communityPostsService.incrementPostView(postId);
+        return ResultUtils.success(count);
+    }
+
 //    /**
 //     * 帖子点赞接口
 //     *

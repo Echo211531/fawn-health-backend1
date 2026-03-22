@@ -3,6 +3,14 @@ server:
   servlet:
     context-path: /api
 
+# 知识库（classpath:document/**/*.md）写入 PgVector：向量本身已持久在 PostgreSQL；
+# on.startup：是否启动时向量化；skip-if-unchanged：源文件未变更则跳过重复 embedding。
+load:
+  documents:
+    on:
+      startup: true
+    skip-if-unchanged: true
+
 spring:
   ai:
     dashscope:
@@ -95,11 +103,6 @@ sky:
     user-secret-key: ${sky.jwt.user-secret-key}
     user-ttl: 7200000
     user-token-name: token
-
-load:
-  documents:
-    on:
-      startup: true
 
 zhipu:
   api-key: ${zhipu.api-key}

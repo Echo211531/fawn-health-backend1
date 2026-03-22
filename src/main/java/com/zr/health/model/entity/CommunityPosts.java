@@ -73,6 +73,11 @@ public class CommunityPosts implements Serializable {
     private Integer shareCount;
 
     /**
+     * 浏览量
+     */
+    private Integer viewCount;
+
+    /**
      * 是否置顶:0否,1是
      */
     private Integer isTop;

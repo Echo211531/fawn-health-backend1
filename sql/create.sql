@@ -695,3 +695,9 @@ CREATE TABLE `user_follow` (
 -- 添加唯一索引，保证同一用户对同一优惠券只能有一条记录
 ALTER TABLE `user_coupon`
     ADD UNIQUE INDEX `uk_user_coupon` (`user_id`, `coupon_id`);
+
+
+
+-- 社区帖子浏览量（执行一次即可）
+ALTER TABLE community_posts
+    ADD COLUMN view_count INT NOT NULL DEFAULT 0 COMMENT '浏览量' AFTER share_count;
