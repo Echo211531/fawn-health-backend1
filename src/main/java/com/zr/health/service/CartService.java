@@ -31,6 +31,15 @@ public interface CartService extends IService<Cart> {
     void removeFromCart(Long userId, Long productId);
 
     /**
+     * 将购物车中某商品数量更新为指定值（用于前端步进器）
+     *
+     * @param userId    用户ID
+     * @param productId 商品ID
+     * @param quantity  新数量，必须大于等于 1
+     */
+    void updateCartItemQuantity(Long userId, Long productId, Integer quantity);
+
+    /**
      * 查询用户购物车列表（包含商品详情）
      *
      * @param userId 用户ID

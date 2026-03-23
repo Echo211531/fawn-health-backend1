@@ -111,6 +111,31 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart>
     }
 
     /**
+     * 更新购物车商品数量
+     */
+    @Override
+    public void updateCartItemQuantity(Long userId, Long productId, Integer quantity) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID不合法");
+        }
+        if (productId == null || productId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "商品ID不合法");
+        }
+        if (quantity == null || quantity < 1) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "数量必须大于等于1");
+        }
+        Cart cart = cartMapper.selectByUserIdAndProductId(userId, productId);
+        if (cart == null || (cart.getIsDelete() != null && cart.getIsDelete() == 1)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "购物车中不存在该商品");
+        }
+        cart.setQuantity(quantity);
+        int rows = cartMapper.updateById(cart);
+        if (rows <= 0) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新数量失败");
+        }
+    }
+
+    /**
      * 查询用户购物车列表（包含商品详情）
      *
      * @param userId 用户ID

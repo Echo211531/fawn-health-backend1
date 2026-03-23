@@ -222,6 +222,23 @@ public class ProductController {
     }
 
     /**
+     * 更新购物车中某商品的数量（步进器减/直接输入）
+     *
+     * @param userId    用户ID
+     * @param productId 商品ID
+     * @param quantity  新数量，须大于等于 1
+     */
+    @PostMapping("/cart/updateQuantity")
+    public BaseResponse<String> updateCartQuantity(
+            @RequestParam Long userId,
+            @RequestParam Long productId,
+            @RequestParam Integer quantity) {
+        cartService.updateCartItemQuantity(userId, productId, quantity);
+        log.info("购物车数量更新成功，用户ID: {}, 商品ID: {}, 数量: {}", userId, productId, quantity);
+        return ResultUtils.success("数量已更新");
+    }
+
+    /**
      * 查询用户购物车列表（包含商品详情）
      *
      * @param userId 用户ID
