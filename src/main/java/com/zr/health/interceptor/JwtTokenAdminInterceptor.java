@@ -9,6 +9,8 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -30,6 +32,11 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.info("JwtTokenAdminInterceptor 执行了！请求路径为：{}", request.getRequestURI());
 
+        // 跨域预检请求（OPTIONS）不应做鉴权校验，否则会导致前端在已登录状态下也被401拦截
+        if (HttpMethod.OPTIONS.matches(request.getMethod())) {
+            return true;
+        }
+
         // 初始化当前线程的用户ID，防止残留数据
         BaseContext.removeCurrentId();
 
@@ -41,6 +48,13 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
 
         // 1、从请求头中获取令牌
         String token = request.getHeader(jwtProperties.getUserTokenName());
+        // 兼容标准 Authorization: Bearer <token> 写法，便于Postman/网关接入
+        if (token == null || token.trim().isEmpty()) {
+            String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+            if (authorization != null && authorization.startsWith("Bearer ")) {
+                token = authorization.substring(7).trim();
+            }
+        }
         log.info("获取到的令牌: {}", token != null ? "***" : "null");
 
         // 2、校验令牌
