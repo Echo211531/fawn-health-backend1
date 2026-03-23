@@ -213,12 +213,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (user.getStatus() != 1) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号已被禁用，请联系超级管理员");
         }
-
-        // 对前端传过来的明文密码进行md5加密
-        String encryptedPassword = DigestUtils.md5DigestAsHex(password.getBytes());
-
         // 验证密码
-        if (!encryptedPassword.equals(user.getPassword())) {
+        if (!password.equals(user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
