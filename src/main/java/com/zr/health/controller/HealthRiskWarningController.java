@@ -1,8 +1,12 @@
 package com.zr.health.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zr.health.commen.BaseResponse;
 import com.zr.health.config.ResultUtils;
 import com.zr.health.manager.sse.SseEmitterManager;
+import com.zr.health.model.dto.healthWarning.HealthWarningAddDTO;
+import com.zr.health.model.dto.healthWarning.HealthWarningPageQueryDTO;
+import com.zr.health.model.dto.healthWarning.HealthWarningUpdateDTO;
 import com.zr.health.model.entity.HealthRiskWarning;
 import com.zr.health.service.HealthRiskWarningService;
 import jakarta.annotation.Resource;
@@ -88,5 +92,37 @@ public class HealthRiskWarningController {
     public BaseResponse<Boolean> processWarning(@PathVariable Long id) {
         boolean ok = service.markProcessed(id);
         return ResultUtils.success(ok);
+    }
+
+    /**
+     * 管理端新增预警
+     */
+    @PostMapping("/add")
+    public BaseResponse<HealthRiskWarning> addWarning(@RequestBody HealthWarningAddDTO addDTO) {
+        return ResultUtils.success(service.addWarning(addDTO));
+    }
+
+    /**
+     * 管理端更新预警
+     */
+    @PostMapping("/update")
+    public BaseResponse<HealthRiskWarning> updateWarning(@RequestBody HealthWarningUpdateDTO updateDTO) {
+        return ResultUtils.success(service.updateWarning(updateDTO));
+    }
+
+    /**
+     * 管理端删除预警（逻辑删除）
+     */
+    @PostMapping("/delete")
+    public BaseResponse<Boolean> deleteWarning(@RequestParam Long id) {
+        return ResultUtils.success(service.deleteWarning(id));
+    }
+
+    /**
+     * 管理端分页查询预警
+     */
+    @PostMapping("/pageQuery")
+    public BaseResponse<IPage<HealthRiskWarning>> pageQueryWarnings(@RequestBody HealthWarningPageQueryDTO queryDTO) {
+        return ResultUtils.success(service.pageQueryWarnings(queryDTO));
     }
 }

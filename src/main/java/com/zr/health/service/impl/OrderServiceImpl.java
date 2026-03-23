@@ -881,10 +881,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
         LambdaQueryWrapper<Order> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Order::getIsDelete, 0);
 
-        // 用户ID查询条件（保持不变）
-        queryWrapper.eq(queryDTO.getUserId() != null, Order::getUserId, queryDTO.getUserId());
-        // 订单ID查询条件（补充：建议也加上非空判断，避免查询条件无效）
-        queryWrapper.eq(queryDTO.getOrderId() != null, Order::getId, queryDTO.getOrderId());
+        // 用户ID、订单ID需同时满足“非空且非空白字符串”后才参与筛选，避免 id = '' 导致查不到数据
+        Long userId = parseToLongOrNull(queryDTO.getUserId(), "用户ID");
+        Long orderId = parseToLongOrNull(queryDTO.getOrderId(), "订单ID");
+        queryWrapper.eq(userId != null, Order::getUserId, userId);
+        queryWrapper.eq(orderId != null, Order::getId, orderId);
 
         // 新增：支付方式查询条件（paymentType 不为空时才添加）
         queryWrapper.eq(queryDTO.getPaymentType() != null, Order::getPaymentType, queryDTO.getPaymentType());
@@ -897,6 +898,22 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order>
         Page<Order> orderPage = baseMapper.selectPage(page, queryWrapper);
         // 转换为VO（保持原有逻辑）
         return orderPage.convert(this::convertToOrderVO);
+    }
+
+    /**
+     * 将字符串参数安全转换为Long：
+     * 1. null/空白字符串 -> null（表示不参与筛选）
+     * 2. 非法数字 -> 抛出参数异常，避免隐式SQL条件错误
+     */
+    private Long parseToLongOrNull(String value, String fieldName) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ex) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, fieldName + "格式错误");
+        }
     }
 
 

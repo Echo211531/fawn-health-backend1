@@ -437,19 +437,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      */
     @Override
     public User getLoginUser(HttpServletRequest request) {
-        // 先判断是否已登录
+        // 优先从 Session 获取（兼容邮箱验证码登录）
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         User currentUser = (User) userObj;
-        if (currentUser == null || currentUser.getId() == null) {
-            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        Long userId = currentUser == null ? null : currentUser.getId();
+
+        // Session 不存在时，降级为从 JWT 解析（兼容管理员账号密码登录）
+        if (userId == null) {
+            String token = request.getHeader(jwtProperties.getUserTokenName());
+            if (StringUtils.isBlank(token)) {
+                throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+            }
+            try {
+                Long parsedUserId = Long.valueOf(
+                        JwtUtil.parseJWT(jwtProperties.getUserSecretKey(), token)
+                                .get(JwtClaimsConstant.USER_ID)
+                                .toString()
+                );
+                userId = parsedUserId;
+            } catch (Exception e) {
+                log.warn("解析登录用户Token失败: {}", e.getMessage());
+                throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+            }
         }
-        long userId = currentUser.getId();
+
         currentUser = this.getById(userId);
         if (currentUser == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
 
         BaseContext.setCurrentId(userId);
+        // 将用户同步回 Session，减少后续重复解析 JWT
+        request.getSession().setAttribute(USER_LOGIN_STATE, currentUser);
 
         return currentUser;
     }

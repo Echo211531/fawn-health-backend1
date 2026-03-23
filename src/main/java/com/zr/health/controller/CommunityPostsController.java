@@ -252,8 +252,8 @@ public class CommunityPostsController {
      * @return 匹配的帖子列表
      */
     @GetMapping("/search")
-    public BaseResponse<List<CommunityPostsVO>> searchPosts(@RequestParam String keyword) {
-        ThrowUtils.throwIf(keyword == null || keyword.trim().isEmpty(), ErrorCode.PARAMS_ERROR, "搜索关键词不能为空");
+    public BaseResponse<List<CommunityPostsVO>> searchPosts(
+            @RequestParam(required = false, defaultValue = "") String keyword) {
         List<CommunityPostsVO> posts = communityPostsService.searchPosts(keyword.trim());
         return ResultUtils.success(posts);
     }

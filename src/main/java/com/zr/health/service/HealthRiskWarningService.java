@@ -1,5 +1,9 @@
 package com.zr.health.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.zr.health.model.dto.healthWarning.HealthWarningAddDTO;
+import com.zr.health.model.dto.healthWarning.HealthWarningPageQueryDTO;
+import com.zr.health.model.dto.healthWarning.HealthWarningUpdateDTO;
 import com.zr.health.model.entity.HealthRiskWarning;
 
 import java.time.LocalDateTime;
@@ -31,4 +35,24 @@ public interface HealthRiskWarningService {
      * 统计用户未处理预警数量
      */
     long countUnprocessedByUser(Long userId);
+
+    /**
+     * 管理端新增预警
+     */
+    HealthRiskWarning addWarning(HealthWarningAddDTO addDTO);
+
+    /**
+     * 管理端更新预警
+     */
+    HealthRiskWarning updateWarning(HealthWarningUpdateDTO updateDTO);
+
+    /**
+     * 管理端删除预警（逻辑删除）
+     */
+    boolean deleteWarning(Long id);
+
+    /**
+     * 管理端分页查询预警
+     */
+    IPage<HealthRiskWarning> pageQueryWarnings(HealthWarningPageQueryDTO queryDTO);
 }
