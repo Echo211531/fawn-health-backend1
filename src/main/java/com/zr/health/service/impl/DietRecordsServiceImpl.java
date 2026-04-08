@@ -149,6 +149,138 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
         return value1.multiply(value2);
     }
 
+    @Override
+    public BigDecimal replaceDietRecord(DietRecordAddDTO dto) {
+        if (dto == null || dto.getUserId() == null || dto.getMealType() == null) {
+            return BigDecimal.ZERO;
+        }
+
+        LocalDate localDate = LocalDate.now();
+        Date startDate = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date endDate = Date.from(localDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date now = new Date();
+
+        QueryWrapper<DietRecords> mealWrapper = new QueryWrapper<>();
+        mealWrapper.eq("user_id", dto.getUserId())
+                .eq("meal_type", dto.getMealType())
+                .ge("record_date", startDate)
+                .lt("record_date", endDate)
+                .eq("is_delete", 0)
+                .orderByDesc("update_time")
+                .orderByDesc("create_time")
+                .orderByDesc("id");
+        List<DietRecords> mealRecords = dietRecordsMapper.selectList(mealWrapper);
+
+        List<DietFoodItemDTO> validFoodItems = dto.getFoodItems() == null ? Collections.emptyList() :
+                dto.getFoodItems().stream()
+                        .filter(item -> item.getFoodId() != null
+                                && item.getAmount() != null
+                                && item.getAmount().compareTo(BigDecimal.ZERO) > 0)
+                        .collect(Collectors.toList());
+
+        if (validFoodItems.isEmpty()) {
+            for (DietRecords oldRecord : mealRecords) {
+                dietFoodItemsMapper.deleteByRecordId(oldRecord.getId());
+                oldRecord.setIsDelete(1);
+                oldRecord.setUpdateTime(now);
+                dietRecordsMapper.updateById(oldRecord);
+            }
+            if (this.applicationEventPublisher != null) {
+                this.applicationEventPublisher.publishEvent(new DietRecordCreatedEvent(dto.getUserId()));
+            }
+            return BigDecimal.ZERO;
+        }
+
+        DietRecords record = mealRecords.isEmpty() ? null : mealRecords.get(0);
+        if (record == null) {
+            record = new DietRecords();
+            record.setUserId(dto.getUserId());
+            record.setMealType(dto.getMealType());
+            record.setRecordDate(now);
+            record.setRecordTime(now);
+            record.setNote(dto.getNote());
+            record.setCreateTime(now);
+            record.setUpdateTime(now);
+            record.setIsDelete(0);
+            int insert = dietRecordsMapper.insert(record);
+            if (insert <= 0) {
+                return BigDecimal.ZERO;
+            }
+        } else {
+            record.setNote(dto.getNote());
+            record.setRecordTime(now);
+            record.setUpdateTime(now);
+            record.setIsDelete(0);
+            dietRecordsMapper.updateById(record);
+        }
+
+        dietFoodItemsMapper.deleteByRecordId(record.getId());
+
+        for (int i = 1; i < mealRecords.size(); i++) {
+            DietRecords duplicateRecord = mealRecords.get(i);
+            dietFoodItemsMapper.deleteByRecordId(duplicateRecord.getId());
+            duplicateRecord.setIsDelete(1);
+            duplicateRecord.setUpdateTime(now);
+            dietRecordsMapper.updateById(duplicateRecord);
+        }
+
+        BigDecimal totalCalories = BigDecimal.ZERO;
+        List<DietFoodItems> items = new ArrayList<>();
+        for (DietFoodItemDTO itemDTO : validFoodItems) {
+            Long foodId = itemDTO.getFoodId();
+            BigDecimal amount = itemDTO.getAmount();
+
+            FoodLibrary food = foodLibraryMapper.selectById(foodId);
+            if (food == null) {
+                continue;
+            }
+
+            DietFoodItems item = new DietFoodItems();
+            item.setRecordId(record.getId());
+            item.setFoodId(foodId);
+            item.setFoodName(food.getName());
+            item.setAmount(amount);
+            item.setUnit(itemDTO.getUnit() == null || itemDTO.getUnit().isBlank() ? "g" : itemDTO.getUnit());
+
+            BigDecimal calories = safeMultiply(food.getCalories(), amount)
+                    .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+            BigDecimal protein = safeMultiply(food.getProtein(), amount)
+                    .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+            BigDecimal fat = safeMultiply(food.getFat(), amount)
+                    .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+            BigDecimal carbohydrate = safeMultiply(food.getCarbohydrate(), amount)
+                    .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+
+            item.setCalories(calories);
+            item.setProtein(protein);
+            item.setFat(fat);
+            item.setCarbohydrate(carbohydrate);
+            item.setImages(food.getImage());
+            item.setNote(itemDTO.getNote());
+            item.setCreateTime(now);
+            item.setUpdateTime(now);
+            item.setIsDelete(0);
+            items.add(item);
+            totalCalories = totalCalories.add(calories);
+        }
+        if (!items.isEmpty()) {
+            dietFoodItemsMapper.batchInsert(items);
+        }
+
+        DietRecords updateRecord = new DietRecords();
+        updateRecord.setId(record.getId());
+        updateRecord.setTotalCalories(totalCalories);
+        updateRecord.setRecordTime(now);
+        updateRecord.setNote(dto.getNote());
+        updateRecord.setUpdateTime(now);
+        dietRecordsMapper.updateById(updateRecord);
+
+        if (this.applicationEventPublisher != null) {
+            this.applicationEventPublisher.publishEvent(new DietRecordCreatedEvent(dto.getUserId()));
+        }
+        return totalCalories;
+    }
+
     /**
      * 查询指定用户某天的饮食记录（简要信息）
      * 

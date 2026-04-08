@@ -5,16 +5,16 @@
 <mapper namespace="com.zr.health.mapper.DietRecordsMapper">
 
     <resultMap id="BaseResultMap" type="com.zr.health.model.entity.DietRecords">
-            <id property="id" column="id" jdbcType="BIGINT"/>
-            <result property="userId" column="user_id" jdbcType="BIGINT"/>
-            <result property="mealType" column="meal_type" jdbcType="TINYINT"/>
-            <result property="recordDate" column="record_date" jdbcType="DATE"/>
-            <result property="recordTime" column="record_time" jdbcType="TIME"/>
-            <result property="note" column="note" jdbcType="VARCHAR"/>
-            <result property="totalCalories" column="total_calories" jdbcType="DECIMAL"/>
-            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
-            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
-            <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
+        <id property="id" column="id" jdbcType="BIGINT"/>
+        <result property="userId" column="user_id" jdbcType="BIGINT"/>
+        <result property="mealType" column="meal_type" jdbcType="TINYINT"/>
+        <result property="recordDate" column="record_date" jdbcType="DATE"/>
+        <result property="recordTime" column="record_time" jdbcType="TIME"/>
+        <result property="note" column="note" jdbcType="VARCHAR"/>
+        <result property="totalCalories" column="total_calories" jdbcType="DECIMAL"/>
+        <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+        <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
     </resultMap>
 
     <select id="selectByUserIdAndDate" resultType="com.zr.health.model.entity.DietRecords">
@@ -24,8 +24,19 @@
           AND is_delete = 0
     </select>
 
+    <select id="selectOneByUserIdMealTypeAndDate" resultType="com.zr.health.model.entity.DietRecords">
+        SELECT * FROM diet_records
+        WHERE user_id = #{userId}
+          AND meal_type = #{mealType}
+          AND record_date &gt;= #{startDate}
+          AND record_date &lt; #{endDate}
+          AND is_delete = 0
+        ORDER BY update_time DESC, create_time DESC
+        LIMIT 1
+    </select>
+
     <sql id="Base_Column_List">
-        id,user_id,meal_type,totalCalories
+        id,user_id,meal_type,total_calories,
         record_date,record_time,note,
         create_time,update_time,is_delete
     </sql>

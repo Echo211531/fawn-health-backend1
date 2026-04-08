@@ -17,6 +17,11 @@ import java.util.List;
 public interface DietRecordsMapper extends BaseMapper<DietRecords> {
     List<DietRecords> selectByUserIdAndDate(@Param("userId") Long userId, @Param("recordDate") Date recordDate);
 
+    DietRecords selectOneByUserIdMealTypeAndDate(@Param("userId") Long userId,
+                                                 @Param("mealType") Integer mealType,
+                                                 @Param("startDate") Date startDate,
+                                                 @Param("endDate") Date endDate);
+
     @Select("SELECT * FROM diet_records " +
             "WHERE user_id = #{userId} " +
             "AND record_date BETWEEN #{startDate} AND #{endDate} " +

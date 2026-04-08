@@ -47,6 +47,19 @@ public class  FoodDiaryController {
         return ResultUtils.success(response);
     }
 
+    @PostMapping("/replaceDietRecord")
+    public BaseResponse<DietRecordAddResponse> replaceDietRecord(@RequestBody DietRecordAddDTO addDTO) {
+        log.info("替换饮食记录: {}", addDTO);
+
+        BigDecimal totalCalories = dietRecordsService.replaceDietRecord(addDTO);
+        boolean result = totalCalories.compareTo(BigDecimal.ZERO) >= 0;
+
+        DietRecordAddResponse response = new DietRecordAddResponse();
+        response.setSuccess(result);
+        response.setTotalCalories(totalCalories);
+        return ResultUtils.success(response);
+    }
+
     /**
      * 获取指定用户某日饮食记录（默认当天）
      *

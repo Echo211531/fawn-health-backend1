@@ -26,6 +26,14 @@ public interface DietRecordsService extends IService<DietRecords> {
     BigDecimal addDietRecord(DietRecordAddDTO dto);
 
     /**
+     * 用当前提交的食物项替换用户当天当前餐次的饮食记录
+     *
+     * @param dto 替换请求
+     * @return 返回替换后的总热量
+     */
+    BigDecimal replaceDietRecord(DietRecordAddDTO dto);
+
+    /**
      * 获取某个用户在指定日期的饮食记录（如果未指定日期，默认取当天）
      *
      * @param userId 用户ID
