@@ -33,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,7 +116,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     private RedissonClient redissonClient;
 
     @Resource
-    private RedisTemplate<String,String> redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     @Resource
     private RabbitTemplate rabbitTemplate;
@@ -211,17 +211,17 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + couponsId;
 
         // 3.1 冷启动时惰性初始化库存到 Redis（非强一致，但只影响首次）
-        if (Boolean.FALSE.equals(redisTemplate.hasKey(stockKey))) {
+        if (Boolean.FALSE.equals(stringRedisTemplate.hasKey(stockKey))) {
             int remainingStock = coupons.getTotalNum() - coupons.getIssueNum();
             if (remainingStock <= 0) {
                 throw new BusinessException(ErrorCode.COUPON_STOCK);
             }
             // 强制转换为纯数字字符串，避免格式问题
-            redisTemplate.opsForValue().set(stockKey, String.valueOf(remainingStock).trim());
+            stringRedisTemplate.opsForValue().set(stockKey, String.valueOf(remainingStock).trim());
             log.info("初始化优惠券库存 - stockKey: {}, 库存值: {}", stockKey, remainingStock);
         }
         // 3. 执行脚本前，先读取Redis中的库存值（确认代码能读到正确值）
-        String redisStock = redisTemplate.opsForValue().get(stockKey);
+        String redisStock = stringRedisTemplate.opsForValue().get(stockKey);
         log.info("【领券】代码读取的库存值 - stockKey: {}, value: {}, 类型: {}",
                 stockKey, redisStock, (redisStock == null ? "null" : redisStock.getClass().getName()));
         // 4. 执行 Lua：原子预扣减库存 + 用户限领计数
@@ -229,7 +229,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         script.setScriptText(COUPON_PRE_DECR_LUA);
         script.setResultType(Long.class);
 
-        Long result = redisTemplate.execute(
+        Long result = stringRedisTemplate.execute(
                 script,
                 Arrays.asList(stockKey, userKey),
                 userId.toString(),
@@ -245,13 +245,14 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
             throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
         }
 
-        // 5. 发送 MQ 消息（异步更新数据库库存 + 创建用户券记录）
+        String requestId = UUID.randomUUID().toString();
         UserCouponDTO uc = new UserCouponDTO();
         uc.setUserId(userId);
         uc.setCouponId(couponsId);
+        uc.setRequestId(requestId);
         messageProducer.sendCouponMessage(MqConstant.FH_ROUTING_KEY, uc);
 
-        log.info("优惠券 Lua 预扣减成功: userId={}, couponId={}", userId, couponsId);
+        log.info("优惠券 Lua 预扣减成功: userId={}, couponId={}, requestId={}", userId, couponsId, requestId);
         // 用户券记录由 MQ 异步创建，这里快速返回
         return 1;
     }
@@ -261,7 +262,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         // 1.准备KEY
         String key = PromotionConstants.COUPON_CACHE_KEY_PREFIX + couponId;
         // 2.查询
-        Map<Object, Object> objMap = redisTemplate.opsForHash().entries(key);
+        Map<Object, Object> objMap = stringRedisTemplate.opsForHash().entries(key);
         System.out.println("Redis 中缓存的 coupon 数据：" + objMap);
         if (objMap.isEmpty()) {
             return null;
@@ -275,6 +276,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         UserCoupon uc = new UserCoupon();
         uc.setUserId(userId);
         uc.setCouponId(coupons.getId());
+        uc.setStatus(UserCouponStatus.UNUSED);
         System.out.println("Coupon ID: " + uc.getCouponId());
         // 2.有效期信息
         Date termBeginTime = coupons.getTermBeginTime();
@@ -287,8 +289,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         uc.setTermEndTime(termEndTime);
 
         // 3.保存
-        int i = userCouponMapper.insert(uc);
-        return i;
+        return userCouponMapper.insert(uc);
     }
 
     /**
@@ -301,27 +302,21 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     @Override
     @Transactional
     public int checkAndCreateUserCoupon(Coupons coupons, Long userId, Integer serialNum){
-        String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + coupons.getId();
-        
-        try {
-            // 1. 延迟双删：第一次删除 Redis（确保读请求完成）
-            redisTemplate.delete(userKey);
-            
-            // 2. 校验每人限领数量（数据库最终校验）
-            Integer count = Math.toIntExact(lambdaQuery()
+            int count = Math.toIntExact(lambdaQuery()
                     .eq(UserCoupon::getUserId, userId)
                     .eq(UserCoupon::getCouponId, coupons.getId())
                     .count());
-            
-            // 3. 校验限领数量
-            if(count != null && count >= coupons.getUserLimit()){
+            if (count >= coupons.getUserLimit()) {
                 throw new BusinessException(ErrorCode.COUPON_OVER_LIMIT);
             }
-            
-            // 4. 新增用户券（数据库唯一索引保证幂等性）
+
+            int updateCount = couponsMapper.incrIssueNum(coupons.getId());
+            if (updateCount == 0) {
+                throw new BusinessException(ErrorCode.COUPON_STOCK);
+            }
+
             int i = saveUserCoupon(coupons, userId);
-            
-            // 5. 更新兑换码状态
+
             if (serialNum != null) {
                 exchangeCodeService.lambdaUpdate()
                         .set(ExchangeCode::getUserId, userId)
@@ -329,33 +324,8 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                         .eq(ExchangeCode::getId, serialNum)
                         .update();
             }
-            
-            // 6. 延迟删除 Redis（第二次，确保数据库事务提交后的读请求也能获取最新数据）
-            // 使用异步任务延迟删除，避免阻塞
-            new Thread(() -> {
-                try {
-                    Thread.sleep(500);  // 延迟500ms
-                    redisTemplate.delete(userKey);
-                    log.debug("延迟双删完成: userId={}, couponId={}", userId, coupons.getId());
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.error("延迟双删线程被中断", e);
-                }
-            }).start();
-            
-            // 7. 更新 Redis（写入最新数据）
-            redisTemplate.opsForHash().increment(userKey, userId.toString(), 1);
-            
             return i;
-        } catch (Exception e) {
-            // 异常时回滚 Redis
-            try {
-                redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
-            } catch (Exception ex) {
-                log.error("回滚 Redis 失败", ex);
-            }
-            throw e;
-        }
+
     }
 
     /**
@@ -546,73 +516,37 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
 
     private List<CouponDiscountDTO> findBestSolution(List<CouponDiscountDTO> list) {
-        // 1.准备Map记录最优解
-        Map<String, CouponDiscountDTO> moreDiscountMap = new HashMap<>();
-        Map<Integer, CouponDiscountDTO> lessCouponMap = new HashMap<>();
-        // 2.遍历，筛选最优解
-        for (CouponDiscountDTO solution : list) {
-            // 2.1.计算当前方案的id组合
-            String ids = solution.getIds().stream()
-                    .sorted(Long::compare).map(String::valueOf).collect(Collectors.joining(","));
-            // 2.2.比较用券相同时，优惠金额是否最大
-            CouponDiscountDTO best = moreDiscountMap.get(ids);
-            if (best != null && best.getDiscountAmount() >= solution.getDiscountAmount()) {
-                // 当前方案优惠金额少，跳过
-                continue;
-            }
-            // 2.3.比较金额相同时，用券数量是否最少
-            best = lessCouponMap.get(solution.getDiscountAmount());
-            int size = solution.getIds().size();
-            if (size > 1 && best != null && best.getIds().size() <= size) {
-                // 当前方案用券更多，放弃
-                continue;
-            }
-            // 2.4.更新最优解
-            moreDiscountMap.put(ids, solution);
-            lessCouponMap.put(solution.getDiscountAmount(), solution);
-        }
-        // 3.求交集
-        Collection<CouponDiscountDTO> moreDiscounts = moreDiscountMap.values();
-        Collection<CouponDiscountDTO> lessCoupons = lessCouponMap.values();
-
-        Collection<CouponDiscountDTO> bestSolutions = moreDiscounts.stream()
-                .filter(lessCoupons::contains)
-                .collect(Collectors.toList());
-
-        // 4.排序，按优惠金额降序
-        return bestSolutions.stream()
-                .sorted(Comparator.comparingInt(CouponDiscountDTO::getDiscountAmount).reversed())
+        return list.stream()
+                .sorted(Comparator.comparingInt(CouponDiscountDTO::getDiscountAmount).reversed()
+                        .thenComparing(dto -> dto.getIds().stream().min(Long::compareTo).orElse(Long.MAX_VALUE)))
                 .collect(Collectors.toList());
     }
 
     private CouponDiscountDTO calculateSolutionDiscount(Map<Coupons, List<OrderProductDTO>> availableCouponMap, List<OrderProductDTO> orderProducts, List<Coupons> solution) {
-            // 1.初始化DTO
-            CouponDiscountDTO dto = new CouponDiscountDTO();
-            // 2.初始化折扣明细的映射
-            Map<Long, Integer> detailMap = orderProducts.stream().collect(Collectors.toMap(OrderProductDTO::getId, oc -> 0));
-            // 3.计算折扣
-            for (Coupons coupon : solution) {
-                // 3.1.获取优惠券限定范围对应的课程
-                List<OrderProductDTO> availableCourses = availableCouponMap.get(coupon);
-                // 3.2.计算课程总价(课程原价 - 折扣明细)
-                int totalAmount = availableCourses.stream()
-                        .mapToInt(oc -> oc.getPrice() - detailMap.get(oc.getId())).sum();
-                // 3.3.判断是否可用
-                Discount discount = DiscountStrategy.getDiscount(DiscountType.of(coupon.getDiscountType()));
-                if (!discount.canUse(totalAmount, coupon)) {
-                    // 券不可用，跳过
-                    continue;
-                }
-                // 3.4.计算优惠金额
-                int discountAmount = discount.calculateDiscount(totalAmount, coupon);
-                // 3.5.计算优惠明细
-                calculateDiscountDetails(detailMap, availableCourses, totalAmount, discountAmount);
-                // 3.6.更新DTO数据
-                dto.getIds().add(coupon.getCreater());
-                dto.getRules().add(discount.getRule(coupon));
-                dto.setDiscountAmount(discountAmount + dto.getDiscountAmount());
-            }
+        CouponDiscountDTO dto = new CouponDiscountDTO();
+        if (solution == null || solution.isEmpty()) {
             return dto;
+        }
+        Coupons coupon = solution.get(0);
+        List<OrderProductDTO> availableCourses = availableCouponMap.get(coupon);
+        if (availableCourses == null || availableCourses.isEmpty()) {
+            return dto;
+        }
+        int totalAmount = availableCourses.stream().mapToInt(OrderProductDTO::getPrice).sum();
+        Discount discount = DiscountStrategy.getDiscount(DiscountType.of(coupon.getDiscountType()));
+        if (!discount.canUse(totalAmount, coupon)) {
+            return dto;
+        }
+        int discountAmount = discount.calculateDiscount(totalAmount, coupon);
+        if (discountAmount < 0) {
+            discountAmount = 0;
+        } else if (discountAmount > totalAmount) {
+            discountAmount = totalAmount;
+        }
+        dto.getIds().add(coupon.getCreater());
+        dto.getRules().add(discount.getRule(coupon));
+        dto.setDiscountAmount(discountAmount);
+        return dto;
     }
 
     private void calculateDiscountDetails(Map<Long, Integer> detailMap, List<OrderProductDTO> availableCourses, int totalAmount, int discountAmount) {

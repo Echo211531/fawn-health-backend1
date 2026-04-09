@@ -15,4 +15,6 @@ public class UserCouponDTO implements Serializable {
      * 优惠券id
      */
     private Long couponId;
+
+    private String requestId;
 }

@@ -1,6 +1,7 @@
 package com.zr.health.handler;
 
 import com.zr.health.constant.PromotionConstants;
+import com.zr.health.exception.BusinessException;
 import com.zr.health.mapper.CommentLikesMapper;
 import com.zr.health.mapper.CouponsMapper;
 import com.rabbitmq.client.Channel;
@@ -15,11 +16,12 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.Duration;
 
 @Slf4j
 @Component
@@ -32,7 +34,7 @@ public class PromotionMqHandler {
     @Resource
     private CommentLikesMapper commentLikesMapper;
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 优惠券消息消费者（带幂等性保障 + 数据库库存更新）
@@ -48,9 +50,18 @@ public class PromotionMqHandler {
                                     @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
         String stockKey = PromotionConstants.COUPON_CACHE_KEY_PREFIX + couponDTO.getCouponId() + ":stock";
         String userKey = PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + couponDTO.getCouponId();
+        String requestId = couponDTO.getRequestId();
+        String requestKey = requestId == null ? null : (PromotionConstants.USER_COUPON_CACHE_KEY_PREFIX + "req:" + requestId);
         
         try {
             log.info("收到优惠券消息: userId={}, couponId={}", couponDTO.getUserId(), couponDTO.getCouponId());
+            if (requestKey != null) {
+                Boolean first = stringRedisTemplate.opsForValue().setIfAbsent(requestKey, "1", Duration.ofDays(1));
+                if (Boolean.FALSE.equals(first)) {
+                    channel.basicAck(deliveryTag, false);
+                    return;
+                }
+            }
 
             // 1. 查询优惠券信息
             Coupons coupon = couponsMapper.selectById(couponDTO.getCouponId());
@@ -58,32 +69,23 @@ public class PromotionMqHandler {
                 log.error("优惠券不存在: couponId={}", couponDTO.getCouponId());
                 // 回滚 Redis
                 rollbackRedis(stockKey, userKey, couponDTO.getUserId());
+                if (requestKey != null) {
+                    stringRedisTemplate.delete(requestKey);
+                }
                 channel.basicAck(deliveryTag, false);
                 return;
             }
 
-            // 2. 数据库原子更新库存（防止超卖，保证最终一致性）
-            int updateCount = couponsMapper.incrIssueNum(couponDTO.getCouponId());
-            if (updateCount == 0) {
-                // 数据库库存不足，回滚 Redis
-                log.warn("数据库库存不足，回滚 Redis: userId={}, couponId={}", 
-                         couponDTO.getUserId(), couponDTO.getCouponId());
-                rollbackRedis(stockKey, userKey, couponDTO.getUserId());
-                channel.basicAck(deliveryTag, false);  // 确认消息，避免重复处理
-                return;
-            }
-
-            // 3. 创建用户券记录（数据库唯一索引保证幂等性）
             userCouponService.checkAndCreateUserCoupon(coupon, couponDTO.getUserId(), null);
 
-            // 4. 手动确认消息
+            // 3. 手动确认消息
             channel.basicAck(deliveryTag, false);
             log.info("优惠券消息处理成功: userId={}, couponId={}", couponDTO.getUserId(), couponDTO.getCouponId());
             
         } catch (DuplicateKeyException e) {
-            // 幂等性处理：用户券已存在，但数据库库存已更新，直接确认消息
-            log.info("用户券已存在，跳过处理（幂等）: userId={}, couponId={}", 
-                     couponDTO.getUserId(), couponDTO.getCouponId());
+            log.warn("用户券写入重复键（请检查 user_coupon 是否存在唯一索引 uk_user_coupon）：userId={}, couponId={}",
+                    couponDTO.getUserId(), couponDTO.getCouponId());
+            rollbackRedis(stockKey, userKey, couponDTO.getUserId());
             try {
                 channel.basicAck(deliveryTag, false);
             } catch (IOException ex) {
@@ -95,8 +97,14 @@ public class PromotionMqHandler {
             try {
                 // 处理失败，回滚 Redis
                 rollbackRedis(stockKey, userKey, couponDTO.getUserId());
-                // 拒绝消息并发送到死信队列（可以重试）
-                channel.basicNack(deliveryTag, false, true);  // requeue=true，重新入队
+                if (e instanceof BusinessException) {
+                    channel.basicAck(deliveryTag, false);
+                } else {
+                    if (requestKey != null) {
+                        stringRedisTemplate.delete(requestKey);
+                    }
+                    channel.basicNack(deliveryTag, false, true);
+                }
             } catch (IOException ex) {
                 log.error("发送 NACK 失败: {}", ex.getMessage());
             }
@@ -109,9 +117,9 @@ public class PromotionMqHandler {
     private void rollbackRedis(String stockKey, String userKey, Long userId) {
         try {
             // 回滚库存
-            redisTemplate.opsForValue().increment(stockKey);
+            stringRedisTemplate.opsForValue().increment(stockKey);
             // 回滚用户限领数量
-            redisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
+            stringRedisTemplate.opsForHash().increment(userKey, userId.toString(), -1);
             log.info("Redis 回滚成功: userId={}, stockKey={}", userId, stockKey);
         } catch (Exception e) {
             log.error("Redis 回滚失败: userId={}, stockKey={}", userId, stockKey, e);

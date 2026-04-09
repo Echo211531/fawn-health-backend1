@@ -2,7 +2,6 @@ package com.zr.health.strategy.discount;
 
 
 import com.zr.health.model.entity.Coupons;
-import com.zr.health.utils.NumberUtil;
 import com.zr.health.utils.StringUtil;
 import lombok.RequiredArgsConstructor;
 
@@ -15,31 +14,32 @@ public class PerPriceDiscount implements Discount {
 
     @Override
     public boolean canUse(int totalAmount, Coupons coupons) {
-        return totalAmount >= coupons.getThresholdAmount();
+        return totalAmount >= coupons.getThresholdAmount() * 100;
     }
 
     @Override
     public int calculateDiscount(int totalAmount, Coupons coupons) {
         int discount = 0;
-        Integer thresholdAmount = coupons.getThresholdAmount();
-        Integer discountValue = coupons.getDiscountValue();
+        Integer thresholdAmount = coupons.getThresholdAmount() * 100;
+        Integer discountValue = coupons.getDiscountValue() * 100;
         while (totalAmount >= thresholdAmount) {
             discount += discountValue;
             totalAmount -= thresholdAmount;
         }
-        // 将计算的 discount 转换为 BigDecimal 进行比较
-        BigDecimal calculatedDiscount = BigDecimal.valueOf(discount);
-
-        // 比较并返回最小的值
-        return calculatedDiscount.compareTo(coupons.getMaxDiscountAmount()) > 0 ? coupons.getMaxDiscountAmount().intValue() : calculatedDiscount.intValue();
+        BigDecimal maxDiscountAmount = coupons.getMaxDiscountAmount();
+        if (maxDiscountAmount == null || maxDiscountAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return discount;
+        }
+        return BigDecimal.valueOf(discount).min(maxDiscountAmount.multiply(BigDecimal.valueOf(100))).intValue();
     }
 
     @Override
     public String getRule(Coupons coupon) {
+        BigDecimal max = coupon.getMaxDiscountAmount();
         return StringUtil.format(
                 RULE_TEMPLATE,
-                NumberUtil.scaleToStr(coupon.getThresholdAmount(), 2),
-                NumberUtil.scaleToStr(coupon.getDiscountValue(), 2),
-                NumberUtil.scaleToStr(coupon.getMaxDiscountAmount(), 2));
+                coupon.getThresholdAmount(),
+                coupon.getDiscountValue(),
+                (max == null || max.compareTo(BigDecimal.ZERO) <= 0) ? "不限" : max.stripTrailingZeros().toPlainString());
     }
 }

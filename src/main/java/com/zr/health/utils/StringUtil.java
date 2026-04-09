@@ -10,6 +10,13 @@ public class StringUtil {
      * @return 格式化后的字符串
      */
     public static String format(String template, Object... args) {
-        return String.format(template, args);
+        if (template == null) {
+            return null;
+        }
+        String fmt = template;
+        if (fmt.contains("{}")) {
+            fmt = fmt.replace("{}", "%s");
+        }
+        return String.format(fmt, args);
     }
 }

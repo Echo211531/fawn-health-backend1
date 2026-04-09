@@ -1,43 +1,45 @@
 package com.zr.health.strategy.discount;
 
 import com.zr.health.model.entity.Coupons;
-import com.zr.health.utils.NumberUtil;
 import com.zr.health.utils.StringUtil;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @RequiredArgsConstructor
 public class RateDiscount implements Discount {
 
-    private static final String RULE_TEMPLATE = "满{}打{}折，上限{}元";
+    private static final String RULE_TEMPLATE = "满{}打{}折，上限{}";
 
     @Override
     public boolean canUse(int totalAmount, Coupons coupons) {
-        return totalAmount >= coupons.getThresholdAmount();
+        return totalAmount >= coupons.getThresholdAmount() * 100;
     }
 
     @Override
     public int calculateDiscount(int totalAmount, Coupons coupons) {
-        // 使用 BigDecimal 处理计算
         BigDecimal totalAmountBD = BigDecimal.valueOf(totalAmount);
-        BigDecimal discountRate = BigDecimal.valueOf(coupons.getDiscountValue()).divide(BigDecimal.valueOf(100)); // 折扣率
-        BigDecimal calculatedDiscount = totalAmountBD.multiply(BigDecimal.ONE.subtract(discountRate)); // 计算折扣金额
+        BigDecimal discountRate = BigDecimal.valueOf(coupons.getDiscountValue())
+                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+        BigDecimal payAmount = totalAmountBD.multiply(discountRate).setScale(0, RoundingMode.HALF_UP);
+        BigDecimal calculatedDiscount = totalAmountBD.subtract(payAmount);
 
-        // 获取 maxDiscountAmount，确保不为 null
-        BigDecimal maxDiscountAmount = coupons.getMaxDiscountAmount() != null ? coupons.getMaxDiscountAmount() : BigDecimal.ZERO;
-
-        // 返回最小折扣金额（即最大折扣金额的上限）
-        return calculatedDiscount.min(maxDiscountAmount).intValue();
+        BigDecimal maxDiscountAmount = coupons.getMaxDiscountAmount();
+        if (maxDiscountAmount == null || maxDiscountAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return calculatedDiscount.intValue();
+        }
+        return calculatedDiscount.min(maxDiscountAmount.multiply(BigDecimal.valueOf(100))).intValue();
     }
 
     @Override
     public String getRule(Coupons coupons) {
+        BigDecimal max = coupons.getMaxDiscountAmount();
         return StringUtil.format(
                 RULE_TEMPLATE,
-                NumberUtil.scaleToStr(coupons.getThresholdAmount(), 2),
-                NumberUtil.scaleToStr(coupons.getDiscountValue(), 1),
-                NumberUtil.scaleToStr(coupons.getMaxDiscountAmount(), 2)
+                coupons.getThresholdAmount(),
+                BigDecimal.valueOf(coupons.getDiscountValue()).movePointLeft(1).stripTrailingZeros().toPlainString(),
+                (max == null || max.compareTo(BigDecimal.ZERO) <= 0) ? "不限" : max.stripTrailingZeros().toPlainString() + "元"
         );
     }
 }

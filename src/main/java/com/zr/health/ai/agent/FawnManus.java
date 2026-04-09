@@ -28,7 +28,7 @@ public class FawnManus extends ToolCallAgent {
         private void init(ChatModel dashscopeChatModel) {
                 // 设置智能体名称为"小鹿"，这会在ToolCallAgent的initPromptsWithContext中被使用
                 this.setName("小鹿");
-                this.setMaxSteps(10); // 增加最大步数，支持更复杂的任务
+                this.setMaxSteps(5); // 增加最大步数，支持更复杂的任务
                 // 初始化超级智能体客户端
                 ChatClient chatClient = ChatClient.builder(dashscopeChatModel)
                                 .defaultAdvisors(

@@ -2,7 +2,6 @@ package com.zr.health.strategy.discount;
 
 import com.zr.health.model.entity.Coupons;
 
-import com.zr.health.utils.NumberUtil;
 import com.zr.health.utils.StringUtil;
 import lombok.RequiredArgsConstructor;
 
@@ -14,20 +13,20 @@ public class PriceDiscount implements Discount{
 
     @Override
     public boolean canUse(int totalAmount, Coupons coupons) {
-        return totalAmount >= coupons.getThresholdAmount();
+        return totalAmount >= coupons.getThresholdAmount() * 100;
     }
 
     @Override
     public int calculateDiscount(int totalAmount, Coupons coupons) {
-        return coupons.getDiscountValue();
+        return coupons.getDiscountValue() * 100;
     }
 
     @Override
     public String getRule(Coupons coupons) {
         return StringUtil.format(
                 RULE_TEMPLATE,
-                NumberUtil.scaleToStr(coupons.getThresholdAmount(), 2),
-                NumberUtil.scaleToStr(coupons.getDiscountValue(), 2)
+                coupons.getThresholdAmount(),
+                coupons.getDiscountValue()
         );
     }
 }
