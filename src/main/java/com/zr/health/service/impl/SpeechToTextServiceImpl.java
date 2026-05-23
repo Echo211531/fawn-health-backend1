@@ -271,25 +271,98 @@ public class SpeechToTextServiceImpl implements SpeechToTextService {
     }
 
     /**
-     * 负责将上传的PCM音频流按固定字节大小分片，通过WebSocket发送至讯飞服务端
+     * 将上传的音频流按固定字节大小分片，通过WebSocket发送至讯飞服务端。
+     * 自动检测WAV格式并跳过头部，仅发送纯PCM数据。
      *
      * @param webSocket 已建立的WebSocket连接
-     * @param audioFile 前端上传的PCM音频文件
+     * @param audioFile 前端上传的音频文件（支持WAV或原始PCM）
      */
     private void sendAudioStream(WebSocket webSocket, MultipartFile audioFile) throws IOException, InterruptedException {
         try (InputStream inputStream = audioFile.getInputStream()) {
-            byte[] buffer = new byte[AUDIO_CHUNK_SIZE];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                // 每次只发送实际读取到的有效字节
-                ByteBuffer byteBuffer = ByteBuffer.wrap(Arrays.copyOf(buffer, len));
-                // 这里将每一块都作为一个完整的Binary消息发送（last=true）
-                CompletableFuture<WebSocket> future = webSocket.sendBinary(byteBuffer, true);
-                future.join();
-                // 按文档建议控制发送节奏，避免过快导致引擎报错
-                Thread.sleep(40);
+            // 读取前12字节判断WAV格式（RIFF + WAVE标识）
+            byte[] magic = new byte[12];
+            int magicLen = readFully(inputStream, magic);
+            boolean isWav = magicLen == 12
+                    && magic[0] == 'R' && magic[1] == 'I' && magic[2] == 'F' && magic[3] == 'F'
+                    && magic[8] == 'W' && magic[9] == 'A' && magic[10] == 'V' && magic[11] == 'E';
+
+            InputStream pcmStream;
+            if (isWav) {
+                log.info("检测到WAV格式音频，将跳过头部提取PCM数据");
+                pcmStream = skipWavHeader(inputStream);
+            } else {
+                // 非WAV格式，将已读取的magic字节作为数据头部重新拼接
+                byte[] remaining = inputStream.readAllBytes();
+                byte[] allData = new byte[magicLen + remaining.length];
+                System.arraycopy(magic, 0, allData, 0, magicLen);
+                System.arraycopy(remaining, 0, allData, magicLen, remaining.length);
+                pcmStream = new java.io.ByteArrayInputStream(allData);
+            }
+
+            try (pcmStream) {
+                byte[] buffer = new byte[AUDIO_CHUNK_SIZE];
+                int len;
+                while ((len = pcmStream.read(buffer)) != -1) {
+                    ByteBuffer byteBuffer = ByteBuffer.wrap(buffer, 0, len);
+                    CompletableFuture<WebSocket> future = webSocket.sendBinary(byteBuffer, true);
+                    future.join();
+                    Thread.sleep(40);
+                }
             }
         }
+    }
+
+    /**
+     * 跳过WAV文件头部，定位到PCM数据起始位置（"data" chunk）。
+     */
+    private InputStream skipWavHeader(InputStream inputStream) throws IOException {
+        // 读取fmt chunk大小（字节16-19，小端序uint32）
+        byte[] fmtChunkHeader = new byte[12];
+        readFully(inputStream, fmtChunkHeader);
+        int fmtChunkSize = ((fmtChunkHeader[4] & 0xFF)
+                | ((fmtChunkHeader[5] & 0xFF) << 8)
+                | ((fmtChunkHeader[6] & 0xFF) << 16)
+                | ((fmtChunkHeader[7] & 0xFF) << 24));
+
+        // 跳过fmt chunk剩余部分（fmtChunkSize - 已读的4字节 + 4字节fmt标识）
+        int fmtDataRemaining = fmtChunkSize - (fmtChunkHeader.length - 8);
+        if (fmtDataRemaining > 0) {
+            inputStream.skipNBytes(fmtDataRemaining);
+        }
+
+        // 查找"data" chunk
+        byte[] chunkHeader = new byte[8];
+        while (readFully(inputStream, chunkHeader) == 8) {
+            int chunkSize = ((chunkHeader[4] & 0xFF)
+                    | ((chunkHeader[5] & 0xFF) << 8)
+                    | ((chunkHeader[6] & 0xFF) << 16)
+                    | ((chunkHeader[7] & 0xFF) << 24));
+            if (chunkHeader[0] == 'd' && chunkHeader[1] == 'a' && chunkHeader[2] == 't' && chunkHeader[3] == 'a') {
+                // 找到data chunk，返回从此处开始的流（仅包含PCM数据）
+                return inputStream;
+            }
+            // 非data chunk，跳过该块
+            inputStream.skipNBytes(chunkSize);
+        }
+
+        throw new IOException("WAV文件中未找到data chunk");
+    }
+
+    /**
+     * 从输入流中读取数据填满缓冲区，返回实际读取的字节数。
+     */
+    private int readFully(InputStream inputStream, byte[] buffer) throws IOException {
+        int offset = 0;
+        int remaining = buffer.length;
+        while (remaining > 0) {
+            int read = inputStream.read(buffer, offset, remaining);
+            if (read == -1) {
+                break;
+            }
+            offset += read;
+            remaining -= read;
+        }
+        return offset;
     }
 
     /**
