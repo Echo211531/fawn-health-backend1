@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -35,10 +36,25 @@ public class DietTool {
      * 3. 使用事务保证数据一致性
      */
     //@Transactional(rollbackFor = Exception.class)
-    @Tool( description = "添加饮食记录到数据库，用户必须指定餐次类型（早餐/午餐/晚餐/加餐）和食物列表。")
+    @Tool(description = """
+            添加饮食记录到数据库。
+            当用户提到吃了什么、喝了什么、某餐吃了什么、要求记录饮食、计算热量时调用此工具。
+            触发场景举例：「我早餐吃了…」「记录一下午餐」「今天吃了…」「帮我记晚饭」「刚才喝了…」「加餐吃了…」。
+            用户必须明确或可推断餐次类型（早餐/午餐/晚餐/加餐）和具体食物名称及用量。
+            """)
     public String addDietRecord(
-            @ToolParam(description = "餐次类型，必须是：早餐、午餐、晚餐或加餐", required = true) String mealType,
-            @ToolParam(description = "食物项列表(提供名称、食用量、单位（g或份）和可选备注)，格式：'食物名称1:食用量1:单位1:备注1;食物名称2:食用量2:单位2:备注2'", required = true) String foodItems
+            @ToolParam(description = "餐次类型，必须是以下之一：早餐、午餐、晚餐、加餐。如用户未明确说明，根据时间和食物内容推断", required = true) String mealType,
+            @ToolParam(description = """
+                    食物项列表。多个食物用分号(;)分隔，每个食物格式：食物名称:食用量:单位:备注。
+                    单位必须是 'g' 或 '份'，备注可选。
+                    用户通常不会提供精确克数（如"吃了两个鸡蛋""喝了一杯牛奶""吃了一碗米饭"），
+                    请根据常识自动估算合理克数，参考值：
+                    - 1个鸡蛋 ≈ 50g、1碗米饭 ≈ 150g、1杯牛奶 ≈ 250g、1个苹果 ≈ 200g
+                    - 1片面包 ≈ 30g、1根香蕉 ≈ 120g、1个馒头 ≈ 100g、1碗粥 ≈ 300g
+                    - 对于明确可按'份'计数的食物（如鸡蛋、包子），优先使用'份'作为单位
+                    示例：'鸡蛋:2:份:水煮;牛奶:250:g:全脂;馒头:1:份'。
+                    注意：食物名称必须与食物库中已有名称一致，相近的请自行匹配。
+                    """, required = true) String foodItems
      ) {
 
         // 验证并转换餐次类型

@@ -96,7 +96,7 @@ public class DietRecordsServiceImpl extends ServiceImpl<DietRecordsMapper, DietR
                     item.setFoodId(foodId);
                     item.setFoodName(food.getName());
                     item.setAmount(amount);
-                    item.setUnit("g");
+                    item.setUnit(itemDTO.getUnit() == null || itemDTO.getUnit().isBlank() ? "g" : itemDTO.getUnit());
 
                     // 营养素 = 每100g值 * 实际克数 / 100
                     BigDecimal calories = safeMultiply(food.getCalories(), amount).divide(BigDecimal.valueOf(100), 2,

@@ -49,6 +49,11 @@ public class UserCoupon implements Serializable {
     private Date usedTime;
 
     /**
+     * 领取请求幂等键（抵御MQ重复投递）
+     */
+    private String requestId;
+
+    /**
      * 优惠券状态，1：未使用，2：已使用，3：已失效
      */
     private UserCouponStatus status;
