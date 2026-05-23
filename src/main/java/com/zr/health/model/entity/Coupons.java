@@ -120,6 +120,11 @@ public class Coupons implements Serializable {
     private String extParam;
 
     /**
+     * 优惠券代码
+     */
+    private String code;
+
+    /**
      * 优惠券描述
      */
     private String description;

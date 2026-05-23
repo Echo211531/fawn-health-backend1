@@ -43,6 +43,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -76,12 +77,16 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
     public void addCoupons(CouponsFormDTO couponsFormDTO) {
         Coupons coupons = BeanCopyUtils.copy(couponsFormDTO, Coupons.class);
         coupons.setDiscountType(couponsFormDTO.getDiscountType());
-        coupons.setMaxDiscountAmount(BigDecimal.valueOf(couponsFormDTO.getMaxDiscountAmount()));
-        log.info("添加优惠券最大的优惠金额是：{}", BigDecimal.valueOf(couponsFormDTO.getMaxDiscountAmount()));
+        Integer maxDiscountAmount = couponsFormDTO.getMaxDiscountAmount();
+        coupons.setMaxDiscountAmount(maxDiscountAmount == null ? BigDecimal.ZERO : BigDecimal.valueOf(maxDiscountAmount.longValue()));
+        log.info("添加优惠券最大的优惠金额是：{}", coupons.getMaxDiscountAmount());
         coupons.setObtainWay(couponsFormDTO.getObtainWay());
+        if (coupons.getCode() == null || coupons.getCode().trim().isEmpty()) {
+            coupons.setCode(UUID.randomUUID().toString().replace("-", ""));
+        }
         couponsMapper.insert(coupons);
 
-        if (couponsFormDTO.getSpecific()) {
+        if (Boolean.TRUE.equals(couponsFormDTO.getSpecific())) {
             Long couponsId = coupons.getId();
             List<Long> scopes = couponsFormDTO.getScopes();
             ThrowUtils.throwIf(scopes == null, ErrorCode.COUPON_SCOPE_NOT_FOUND);
@@ -109,7 +114,8 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
 
         Page<Coupons> page = new Page<>(query.getPageNo(), query.getPageSize());
         LambdaQueryWrapper<Coupons> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(query.getType() != null, Coupons::getDiscountType, query.getType())
+        queryWrapper.eq(Coupons::getIsDelete, 0)
+                .eq(query.getType() != null, Coupons::getDiscountType, query.getType())
                 .eq(query.getStatus() != null, Coupons::getStatus, query.getStatus())
                 .like(StringUtils.isNotBlank(query.getName()), Coupons::getName, query.getName())
                 .orderByDesc(Coupons::getCreateTime);
@@ -239,6 +245,7 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
     @Override
     public List<CouponsVO> queryIssuingCoupons(Long id) {
         List<Coupons> coupons = lambdaQuery()
+                .eq(Coupons::getIsDelete, 0)
                 .eq(Coupons::getStatus, CouponStatus.ISSUING)
                 .eq(Coupons::getObtainWay, ObtainType.PUBLIC)
                 .list();
@@ -272,7 +279,8 @@ public class CouponsServiceImpl extends ServiceImpl<CouponsMapper, Coupons>
 
         Page<Coupons> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
         LambdaQueryWrapper<Coupons> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(queryDTO.getDiscountType() != null, Coupons::getDiscountType, queryDTO.getDiscountType())
+        wrapper.eq(Coupons::getIsDelete, 0)
+                .eq(queryDTO.getDiscountType() != null, Coupons::getDiscountType, queryDTO.getDiscountType())
                 .eq(queryDTO.getStatus() != null, Coupons::getStatus, queryDTO.getStatus())
                 .like(StringUtils.isNotBlank(queryDTO.getName()), Coupons::getName, queryDTO.getName())
                 .orderByDesc(Coupons::getCreateTime);

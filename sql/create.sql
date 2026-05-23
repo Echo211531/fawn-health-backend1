@@ -148,6 +148,7 @@ CREATE TABLE `user_coupon`  (
                                 `id` bigint(0) NOT NULL AUTO_INCREMENT COMMENT '用户券id',
                                 `user_id` bigint(0) NOT NULL COMMENT '优惠券的拥有者',
                                 `coupon_id` bigint(0) NOT NULL COMMENT '优惠券模板id',
+                                `request_id` varchar(64) NULL DEFAULT NULL COMMENT '领取请求幂等键（抵御MQ重复投递）',
                                 `term_begin_time` datetime(0) NULL DEFAULT NULL COMMENT '优惠券有效期开始时间',
                                 `term_end_time` datetime(0) NOT NULL COMMENT '优惠券有效期结束时间',
                                 `used_time` datetime(0) NULL DEFAULT NULL COMMENT '优惠券使用时间（核销时间）',
@@ -155,9 +156,10 @@ CREATE TABLE `user_coupon`  (
                                 `create_time` datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) COMMENT '创建时间',
                                 `update_time` datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0) COMMENT '更新时间',
                                 PRIMARY KEY (`id`) USING BTREE,
+                                UNIQUE INDEX `uk_request_id`(`request_id`) USING BTREE,
                                 INDEX `idx_coupon`(`coupon_id`) USING BTREE,
                                 INDEX `idx_user_coupon`(`user_id`, `coupon_id`) USING BTREE
-) ENGINE=InnoDB  CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户领取优惠券的记录，是真正使用的优惠券信息' ROW_FORMAT = Dynamic;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT = '用户领取优惠券的记录，是真正使用的优惠券信息' ROW_FORMAT = Dynamic;
 
 CREATE TABLE `coupon_usage_logs` (
                                      `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'ID',
@@ -701,3 +703,4 @@ ALTER TABLE `user_coupon`
 -- 社区帖子浏览量（执行一次即可）
 ALTER TABLE community_posts
     ADD COLUMN view_count INT NOT NULL DEFAULT 0 COMMENT '浏览量' AFTER share_count;
+ALTER TABLE user_coupon DROP INDEX uk_user_coupon;
